@@ -1080,10 +1080,32 @@ startCombatPhase() {
   });
 
   if (this.gameState.gameMode === 'ai') {
-    document.querySelector('.opponent-boards').style.display = 'block';
+    const opponentBoards = document.querySelector('.opponent-boards');
+    opponentBoards.style.display = 'block';
+
     this.gameState.ships.opponent = this.gameState.createInitialShips();
     this.gameState.boards.opponent = this.gameState.createEmptyBoards();
     this.placeAIShips();
+
+    // Force CSS animations to restart on opponent boards after showing
+    // Animations on ::before elements don't always restart after display:none
+    // Do this after a brief delay to ensure boards are fully rendered
+    setTimeout(() => {
+      document.querySelectorAll('.opponent-boards .board').forEach(board => {
+        // Trigger reflow by cloning and replacing the element
+        const clone = board.cloneNode(true);
+        board.parentNode.replaceChild(clone, board);
+      });
+
+      // Re-attach click listeners after cloning
+      document.querySelectorAll('.opponent-boards .cell').forEach(cell => {
+        cell.addEventListener('click', (e) => {
+          if (this.gameState.phase === 'combat') {
+            this.handleAttack(e);
+          }
+        });
+      });
+    }, 100);
   }
   
   // Place treasure chests AFTER AI ships are placed
