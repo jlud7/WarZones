@@ -933,6 +933,57 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* Ship Placement Visual Feedback */
+.board-section.placement-active {
+  position: relative;
+}
+
+.board-section.placement-active::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 3px solid gold;
+  border-radius: var(--border-radius);
+  animation: placementPulse 1.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+
+.board-section.placement-active .layer-label {
+  background: gold !important;
+  color: #000 !important;
+  font-weight: bold;
+  animation: labelPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes placementPulse {
+  0%, 100% {
+    opacity: 1;
+    border-color: gold;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  }
+  50% {
+    opacity: 0.6;
+    border-color: #ffd700;
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes labelPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  }
+}
+
 /* Responsive Design */
 
 /* Tablet and below - optimize layout */

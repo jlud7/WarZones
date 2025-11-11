@@ -975,7 +975,8 @@ startNewGame(mode) {
     
     this.ui.updateGameInfo(message);
     this.ui.updateCommentary(message);
-    
+    this.ui.highlightPlacementBoard();
+
     this.animateCommentaryBox();
     this.startGameTimer();
   }
@@ -1009,10 +1010,11 @@ startNewGame(mode) {
       // Update the commentary
       const nextShip = this.gameState.getCurrentShip();
       if (nextShip) {
-        const player = this.gameState.gameMode === 'human' 
-          ? `Player ${this.gameState.currentPlayer}: ` 
+        const player = this.gameState.gameMode === 'human'
+          ? `Player ${this.gameState.currentPlayer}: `
           : '';
         this.ui.updateCommentary(`${player}Place your ${nextShip}`);
+        this.ui.highlightPlacementBoard();
       }
       
       if (this.gameState.isPlacementComplete()) {
@@ -1037,6 +1039,7 @@ startNewGame(mode) {
               // Update commentary for player two's setup
               this.ui.updateCommentary(`Player Two: Place your ${this.gameState.getCurrentShip()} on your board.`);
               this.ui.updateGameInfo(`Player Two: Place your ships on your board.`);
+              this.ui.highlightPlacementBoard();
               this.animateCommentaryBox();
               
               document.getElementById('undoMove').style.display = 'inline-block';
@@ -1070,7 +1073,12 @@ startNewGame(mode) {
 startCombatPhase() {
   this.gameState.phase = 'combat';
   this.gameState.currentPlayer = 1; // Always start with player 1 in combat
-  
+
+  // Clear placement highlights
+  document.querySelectorAll('.board-section.placement-active').forEach(section => {
+    section.classList.remove('placement-active');
+  });
+
   if (this.gameState.gameMode === 'ai') {
     document.querySelector('.opponent-boards').style.display = 'block';
     this.gameState.ships.opponent = this.gameState.createInitialShips();
@@ -1454,11 +1462,12 @@ handleAITurn() {
       
       // Update commentary for current ship
       const shipType = this.gameState.getCurrentShip();
-      const player = this.gameState.gameMode === 'human' 
-        ? `Player ${this.gameState.currentPlayer}: ` 
+      const player = this.gameState.gameMode === 'human'
+        ? `Player ${this.gameState.currentPlayer}: `
         : '';
-      
+
       this.ui.updateCommentary(`${player}Place your ${shipType}`);
+      this.ui.highlightPlacementBoard();
       this.ui.updateScoreBoard();
     }
   }
@@ -3320,7 +3329,43 @@ showSonarEffect(side, layer, centerIndex) {
     const commentaryBox = document.getElementById('commentaryText');
     if (commentaryBox) commentaryBox.textContent = message;
   }
-  
+
+  highlightPlacementBoard() {
+    // Remove existing highlights
+    document.querySelectorAll('.board-section.placement-active').forEach(section => {
+      section.classList.remove('placement-active');
+    });
+
+    // Only highlight during setup phase
+    if (this.game.gameState.phase !== 'setup') return;
+
+    // Get current ship being placed
+    const shipType = this.game.gameState.getCurrentShip();
+    if (!shipType) return;
+
+    // Get the layer for this ship
+    const shipConfig = GAME_CONSTANTS.SHIPS[shipType];
+    if (!shipConfig) return;
+
+    const layer = shipConfig.layer;
+
+    // Determine which board to highlight (player or opponent)
+    const boardPrefix = this.game.gameState.gameMode === 'human' && this.game.gameState.currentPlayer === 2
+      ? 'opponent'
+      : 'player';
+
+    // Find and highlight the appropriate board section
+    const boardId = `${boardPrefix}${layer}Board`;
+    const board = document.getElementById(boardId);
+
+    if (board) {
+      const boardSection = board.closest('.board-section');
+      if (boardSection) {
+        boardSection.classList.add('placement-active');
+      }
+    }
+  }
+
   clearBoards() {
     document.querySelectorAll('.board').forEach(board => board.innerHTML = '');
   }
