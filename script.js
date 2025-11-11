@@ -821,8 +821,24 @@ aiUseCannonBall() {
     playerBoardContainer.innerHTML = '';
     opponentBoardContainer.innerHTML = '';
 
+    // Layer label names
+    const layerNames = {
+      'Space': 'SPACE',
+      'Sky': 'SKY',
+      'Sea': 'SEA',
+      'Sub': 'UNDERWATER'
+    };
+
     boards.forEach(board => {
-      // Create player board
+      // Create player board section with label
+      const pBoardSection = document.createElement('div');
+      pBoardSection.className = 'board-section';
+
+      const pLayerLabel = document.createElement('div');
+      pLayerLabel.className = 'layer-label';
+      pLayerLabel.textContent = layerNames[board.id];
+      pBoardSection.appendChild(pLayerLabel);
+
       const pBoard = document.createElement('div');
       pBoard.className = 'board';
       pBoard.id = `player${board.id}Board`;
@@ -832,7 +848,7 @@ aiUseCannonBall() {
         cell.className = 'cell';
         cell.dataset.index = i;
         cell.dataset.layer = board.id;
-        
+
         // Add hover event listeners to each cell
         cell.addEventListener('mouseover', (e) => {
           if (this.gameState.phase === 'setup') {
@@ -850,9 +866,18 @@ aiUseCannonBall() {
 
         pBoard.appendChild(cell);
       }
-      playerBoardContainer.appendChild(pBoard);
+      pBoardSection.appendChild(pBoard);
+      playerBoardContainer.appendChild(pBoardSection);
 
-      // Create opponent board
+      // Create opponent board section with label
+      const oBoardSection = document.createElement('div');
+      oBoardSection.className = 'board-section';
+
+      const oLayerLabel = document.createElement('div');
+      oLayerLabel.className = 'layer-label';
+      oLayerLabel.textContent = layerNames[board.id];
+      oBoardSection.appendChild(oLayerLabel);
+
       const oBoard = document.createElement('div');
       oBoard.className = 'board';
       oBoard.id = `opponent${board.id}Board`;
@@ -862,7 +887,7 @@ aiUseCannonBall() {
         cell.className = 'cell';
         cell.dataset.index = i;
         cell.dataset.layer = board.id;
-        
+
         // Add hover event listeners to each cell
         cell.addEventListener('mouseover', (e) => {
           if (this.gameState.phase === 'setup') {
@@ -880,7 +905,8 @@ aiUseCannonBall() {
 
         oBoard.appendChild(cell);
       }
-      opponentBoardContainer.appendChild(oBoard);
+      oBoardSection.appendChild(oBoard);
+      opponentBoardContainer.appendChild(oBoardSection);
     });
 
     // Add click listeners to cells
