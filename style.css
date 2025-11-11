@@ -1013,7 +1013,7 @@ body {
 /* Mobile landscape and portrait - compact side-by-side verticals */
 @media (max-width: 768px) {
   :root {
-    --cell-size: 28px;
+    --cell-size: 34px;
   }
 
   body {
@@ -1177,7 +1177,7 @@ body {
 /* Small mobile phones - ultra compact */
 @media (max-width: 480px) {
   :root {
-    --cell-size: 20px;
+    --cell-size: 26px;
   }
 
   .win-counter {
@@ -1288,7 +1288,7 @@ body {
 /* Landscape mode optimization for mobile */
 @media (max-width: 896px) and (max-height: 500px) and (orientation: landscape) {
   :root {
-    --cell-size: 22px;
+    --cell-size: 26px;
   }
 
   body {
