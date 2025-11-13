@@ -17,7 +17,43 @@
       <h1>WAR ZONES</h1>
       <div class="menu-buttons">
         <button id="playVsAI" class="menu-button">Play vs AI</button>
-        <button id="playVsHuman" class="menu-button">Play vs Human</button>
+        <button id="playVsHuman" class="menu-button">Play vs Human (Local)</button>
+        <button id="playOnline" class="menu-button online-button">Play Online</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Room Code Menu -->
+  <div id="roomCodeMenu" class="menu-overlay" style="display: none;">
+    <div class="menu-content">
+      <h1>ONLINE MULTIPLAYER</h1>
+      <div class="room-code-section">
+        <p class="room-code-instructions">Enter a 7-character room code to play with a friend:</p>
+        <input type="text" id="roomCodeInput" class="room-code-input" maxlength="7" placeholder="HAWK7XZ" />
+        <div class="room-code-buttons">
+          <button id="joinRoom" class="menu-button">Join Room</button>
+          <button id="generateRoomCode" class="menu-button secondary-button">Generate Code</button>
+        </div>
+        <button id="backToMenu" class="menu-button back-button">Back</button>
+      </div>
+      <div id="connectionStatus" class="connection-status"></div>
+    </div>
+  </div>
+
+  <!-- Waiting Room -->
+  <div id="waitingRoom" class="menu-overlay" style="display: none;">
+    <div class="menu-content">
+      <h1>WAITING FOR OPPONENT</h1>
+      <div class="waiting-content">
+        <p class="room-code-display">Room Code: <span id="currentRoomCode" class="room-code-highlight"></span></p>
+        <p class="waiting-message">Share this code with your friend!</p>
+        <div class="loading-animation">
+          <div class="loading-dot"></div>
+          <div class="loading-dot"></div>
+          <div class="loading-dot"></div>
+        </div>
+        <p id="waitingStatus" class="waiting-status">Waiting for opponent to join...</p>
+        <button id="leaveRoom" class="menu-button back-button">Leave Room</button>
       </div>
     </div>
   </div>
@@ -149,6 +185,26 @@
       </button>
     </div>
   </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyB88Q3McS_IGO45-61gK998FQG3LWw7qME",
+      authDomain: "warzones-a515c.firebaseapp.com",
+      databaseURL: "https://warzones-a515c-default-rtdb.firebaseio.com",
+      projectId: "warzones-a515c",
+      storageBucket: "warzones-a515c.firebasestorage.app",
+      messagingSenderId: "1051625883892",
+      appId: "1:1051625883892:web:56101adfac1596026bf6a1"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+  </script>
 
   <script src="script.js"></script>
 </body>

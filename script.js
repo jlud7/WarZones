@@ -44,6 +44,296 @@ POWERUPS: {
 }
 };
 
+/* --- Firebase Multiplayer Manager --- */
+class FirebaseMultiplayer {
+  constructor(game) {
+    this.game = game;
+    this.database = firebase.database();
+    this.currentRoom = null;
+    this.playerRole = null; // 'player1' or 'player2'
+    this.playerId = this.generatePlayerId();
+    this.roomListeners = [];
+    this.isOnlineMode = false;
+  }
+
+  generatePlayerId() {
+    return 'player_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluding I, O, 0, 1 for clarity
+    let code = '';
+    for (let i = 0; i < 7; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  async createOrJoinRoom(roomCode) {
+    roomCode = roomCode.toUpperCase().trim();
+
+    if (roomCode.length !== 7) {
+      return { success: false, error: 'Room code must be 7 characters' };
+    }
+
+    try {
+      const roomRef = this.database.ref('rooms/' + roomCode);
+      const snapshot = await roomRef.once('value');
+      const roomData = snapshot.val();
+
+      if (!roomData) {
+        // Create new room
+        await roomRef.set({
+          player1: {
+            id: this.playerId,
+            ready: false,
+            connected: true,
+            lastSeen: Date.now()
+          },
+          status: 'waiting',
+          createdAt: Date.now()
+        });
+
+        this.currentRoom = roomCode;
+        this.playerRole = 'player1';
+        this.setupRoomListeners(roomCode);
+
+        return { success: true, role: 'player1', waiting: true };
+      } else if (roomData.status === 'waiting' && !roomData.player2) {
+        // Join existing room
+        await roomRef.child('player2').set({
+          id: this.playerId,
+          ready: false,
+          connected: true,
+          lastSeen: Date.now()
+        });
+
+        await roomRef.child('status').set('setup');
+
+        this.currentRoom = roomCode;
+        this.playerRole = 'player2';
+        this.setupRoomListeners(roomCode);
+
+        return { success: true, role: 'player2', waiting: false };
+      } else if (roomData.status === 'playing' || roomData.player2) {
+        return { success: false, error: 'Room is full or game in progress' };
+      } else {
+        return { success: false, error: 'Unable to join room' };
+      }
+    } catch (error) {
+      console.error('Firebase error:', error);
+      return { success: false, error: 'Connection error: ' + error.message };
+    }
+  }
+
+  setupRoomListeners(roomCode) {
+    const roomRef = this.database.ref('rooms/' + roomCode);
+
+    // Listen for opponent joining
+    const playerJoinListener = roomRef.on('value', (snapshot) => {
+      const roomData = snapshot.val();
+      if (!roomData) {
+        this.handleRoomClosed();
+        return;
+      }
+
+      // Check if both players are present
+      if (roomData.player1 && roomData.player2 && roomData.status === 'setup') {
+        this.handleBothPlayersReady(roomData);
+      }
+
+      // Listen for opponent disconnect
+      this.checkOpponentConnection(roomData);
+    });
+
+    // Listen for game moves
+    const movesListener = roomRef.child('moves').on('child_added', (snapshot) => {
+      const move = snapshot.val();
+      if (move.playerId !== this.playerId) {
+        this.handleOpponentMove(move);
+      }
+    });
+
+    // Listen for ship placements ready
+    const readyListener = roomRef.child(this.playerRole).child('ready').on('value', (snapshot) => {
+      // Will be handled by main value listener
+    });
+
+    this.roomListeners.push({ ref: roomRef, type: 'value', listener: playerJoinListener });
+    this.roomListeners.push({ ref: roomRef.child('moves'), type: 'child_added', listener: movesListener });
+  }
+
+  handleBothPlayersReady(roomData) {
+    // Hide waiting room, show game
+    document.getElementById('waitingRoom').style.display = 'none';
+
+    const opponentName = this.playerRole === 'player1' ? 'Player 2' : 'Player 1';
+    document.getElementById('player2Name').textContent = opponentName;
+    document.getElementById('player2Icon').textContent = '👤';
+
+    this.game.ui.updateCommentary('Opponent joined! Both players set up your ships.');
+  }
+
+  checkOpponentConnection(roomData) {
+    const opponentRole = this.playerRole === 'player1' ? 'player2' : 'player1';
+    const opponent = roomData[opponentRole];
+
+    if (opponent && opponent.connected === false) {
+      this.game.ui.updateCommentary('Opponent disconnected. Waiting for reconnection...');
+    }
+  }
+
+  async updateReady(isReady) {
+    if (!this.currentRoom || !this.playerRole) return;
+
+    try {
+      await this.database.ref(`rooms/${this.currentRoom}/${this.playerRole}/ready`).set(isReady);
+
+      // Check if both players are ready to start combat
+      const roomRef = this.database.ref(`rooms/${this.currentRoom}`);
+      const snapshot = await roomRef.once('value');
+      const roomData = snapshot.val();
+
+      if (roomData.player1?.ready && roomData.player2?.ready && roomData.status === 'setup') {
+        await roomRef.child('status').set('playing');
+        await roomRef.child('currentTurn').set('player1');
+        this.startOnlineGame();
+      }
+    } catch (error) {
+      console.error('Error updating ready status:', error);
+    }
+  }
+
+  async syncShipPlacement(boards) {
+    if (!this.currentRoom || !this.playerRole) return;
+
+    try {
+      // Only sync ship positions (hidden from opponent)
+      await this.database.ref(`rooms/${this.currentRoom}/${this.playerRole}/boards`).set(boards);
+    } catch (error) {
+      console.error('Error syncing ship placement:', error);
+    }
+  }
+
+  async sendMove(layer, cellIndex, result) {
+    if (!this.currentRoom || !this.playerRole) return;
+
+    try {
+      const moveRef = this.database.ref(`rooms/${this.currentRoom}/moves`).push();
+      await moveRef.set({
+        playerId: this.playerId,
+        playerRole: this.playerRole,
+        layer: layer,
+        cell: cellIndex,
+        result: result,
+        timestamp: Date.now()
+      });
+
+      // Update turn if miss
+      if (result === 'miss') {
+        const nextTurn = this.playerRole === 'player1' ? 'player2' : 'player1';
+        await this.database.ref(`rooms/${this.currentRoom}/currentTurn`).set(nextTurn);
+      }
+    } catch (error) {
+      console.error('Error sending move:', error);
+    }
+  }
+
+  handleOpponentMove(move) {
+    // Apply opponent's move to our board
+    const { layer, cell, result } = move;
+
+    // Update the player's board based on opponent's attack
+    const playerBoard = this.game.gameState.boards.player[layer];
+
+    if (result === 'hit') {
+      playerBoard[cell] = 'hit';
+    } else if (result === 'miss') {
+      playerBoard[cell] = 'miss';
+    }
+
+    // Update UI
+    this.game.ui.updateAllBoards();
+    this.game.ui.updateCommentary(`Opponent attacked ${layer} layer - ${result.toUpperCase()}!`);
+
+    // Check if it's our turn now
+    this.checkCurrentTurn();
+  }
+
+  async checkCurrentTurn() {
+    if (!this.currentRoom) return;
+
+    try {
+      const turnRef = this.database.ref(`rooms/${this.currentRoom}/currentTurn`);
+      const snapshot = await turnRef.once('value');
+      const currentTurn = snapshot.val();
+
+      if (currentTurn === this.playerRole) {
+        this.game.ui.updateCommentary("Your turn! Attack opponent's board.");
+      } else {
+        this.game.ui.updateCommentary("Opponent's turn. Wait for their move.");
+      }
+    } catch (error) {
+      console.error('Error checking turn:', error);
+    }
+  }
+
+  startOnlineGame() {
+    this.isOnlineMode = true;
+    this.game.gameState.gameMode = 'online';
+    this.game.gameState.phase = 'combat';
+    this.game.ui.updateCommentary('Both players ready! Game starting...');
+
+    // Determine who goes first
+    if (this.playerRole === 'player1') {
+      this.game.ui.updateCommentary("You go first! Attack opponent's board.");
+    } else {
+      this.game.ui.updateCommentary("Opponent goes first. Wait for their move.");
+    }
+  }
+
+  async leaveRoom() {
+    if (!this.currentRoom || !this.playerRole) return;
+
+    try {
+      // Mark as disconnected
+      await this.database.ref(`rooms/${this.currentRoom}/${this.playerRole}/connected`).set(false);
+
+      // Remove listeners
+      this.roomListeners.forEach(({ ref, type, listener }) => {
+        ref.off(type, listener);
+      });
+      this.roomListeners = [];
+
+      this.currentRoom = null;
+      this.playerRole = null;
+      this.isOnlineMode = false;
+    } catch (error) {
+      console.error('Error leaving room:', error);
+    }
+  }
+
+  handleRoomClosed() {
+    this.game.ui.updateCommentary('Room was closed or deleted.');
+    this.leaveRoom();
+    this.game.ui.renderMainMenu();
+  }
+
+  async isMyTurn() {
+    if (!this.currentRoom || !this.isOnlineMode) return true;
+
+    try {
+      const turnRef = this.database.ref(`rooms/${this.currentRoom}/currentTurn`);
+      const snapshot = await turnRef.once('value');
+      const currentTurn = snapshot.val();
+      return currentTurn === this.playerRole;
+    } catch (error) {
+      console.error('Error checking turn:', error);
+      return false;
+    }
+  }
+}
+
 class WarZones {
   constructor() {
     this.gameState = new GameState();
@@ -53,6 +343,7 @@ class WarZones {
     this.ai = new GameAI(this); // Pass 'this' to GameAI constructor
     this.stats = new Statistics();
     this.tutorial = new Tutorial();
+    this.multiplayer = new FirebaseMultiplayer(this); // Firebase multiplayer
     this.playerWins = 0;
     this.aiWins = 0;
     this.aiTurnTimeouts = []; // Track AI turn timeouts
@@ -937,7 +1228,7 @@ aiUseCannonBall() {
       document.getElementById('player2Icon').textContent = "🤖";
       this.startNewGame('ai');
     });
-    
+
     document.getElementById('playVsHuman').addEventListener('click', () => {
       this.sound.initialize();
       this.gameState.gameMode = 'human';
@@ -945,7 +1236,68 @@ aiUseCannonBall() {
       document.getElementById('player2Icon').textContent = "👤";
       this.startNewGame('human');
     });
-    
+
+    // Online Multiplayer Buttons
+    document.getElementById('playOnline').addEventListener('click', () => {
+      this.sound.initialize();
+      document.getElementById('gameMenu').style.display = 'none';
+      document.getElementById('roomCodeMenu').style.display = 'flex';
+    });
+
+    document.getElementById('backToMenu').addEventListener('click', () => {
+      document.getElementById('roomCodeMenu').style.display = 'none';
+      document.getElementById('gameMenu').style.display = 'flex';
+    });
+
+    document.getElementById('generateRoomCode').addEventListener('click', () => {
+      const roomCode = this.multiplayer.generateRoomCode();
+      document.getElementById('roomCodeInput').value = roomCode;
+    });
+
+    document.getElementById('joinRoom').addEventListener('click', async () => {
+      const roomCode = document.getElementById('roomCodeInput').value.trim();
+      if (!roomCode) {
+        document.getElementById('connectionStatus').textContent = 'Please enter a room code';
+        return;
+      }
+
+      document.getElementById('connectionStatus').textContent = 'Connecting...';
+
+      const result = await this.multiplayer.createOrJoinRoom(roomCode);
+
+      if (result.success) {
+        document.getElementById('roomCodeMenu').style.display = 'none';
+        document.getElementById('waitingRoom').style.display = 'flex';
+        document.getElementById('currentRoomCode').textContent = roomCode;
+
+        if (result.waiting) {
+          document.getElementById('waitingStatus').textContent = 'Waiting for opponent to join...';
+        } else {
+          document.getElementById('waitingStatus').textContent = 'Opponent found! Starting setup...';
+          setTimeout(() => {
+            this.startNewGame('online');
+          }, 1500);
+        }
+      } else {
+        document.getElementById('connectionStatus').textContent = result.error;
+      }
+    });
+
+    document.getElementById('leaveRoom').addEventListener('click', async () => {
+      await this.multiplayer.leaveRoom();
+      document.getElementById('waitingRoom').style.display = 'none';
+      document.getElementById('gameMenu').style.display = 'flex';
+      document.getElementById('roomCodeInput').value = '';
+      document.getElementById('connectionStatus').textContent = '';
+    });
+
+    // Allow Enter key to join room
+    document.getElementById('roomCodeInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('joinRoom').click();
+      }
+    });
+
     document.getElementById('orientationButton').addEventListener('click', () => this.rotateShip());
     document.getElementById('toggleSound').addEventListener('click', () => this.sound.toggleSound());
     document.getElementById('resetGame').addEventListener('click', () => this.startNewGame('ai'));
@@ -981,6 +1333,14 @@ startNewGame(mode) {
       // Update title for player 2's board
       document.getElementById('opponentTitle').textContent = "Player 2";
       this.uiUpdateForHumanPlacement();
+    } else if (mode === 'online') {
+      this.gameState.gameMode = 'online';
+      this.gameState.currentPlayer = 1;
+      document.querySelector('.player-boards').style.display = 'block';
+      document.querySelector('.opponent-boards').style.display = 'none';
+      document.getElementById('undoMove').style.display = 'inline-block';
+      const opponentName = this.multiplayer.playerRole === 'player1' ? 'Player 2' : 'Player 1';
+      document.getElementById('opponentTitle').textContent = opponentName;
     } else {
       this.gameState.gameMode = 'ai';
       document.querySelector('.player-boards').style.display = 'block';
@@ -989,16 +1349,21 @@ startNewGame(mode) {
       // Update title for AI's board
       document.getElementById('opponentTitle').textContent = "AI";
     }
-    
+
     this.ui.clearBoards();
     this.createGameBoards();
     this.sound.playSound('gameStart');
     this.ui.updateScoreBoard();
-    
-    const message = mode === 'ai' 
-      ? 'Place your ships on your board.'
-      : 'Player One: Place your ships on your board.';
-    
+
+    let message;
+    if (mode === 'ai') {
+      message = 'Place your ships on your board.';
+    } else if (mode === 'online') {
+      message = 'Place your ships. Waiting for opponent...';
+    } else {
+      message = 'Player One: Place your ships on your board.';
+    }
+
     this.ui.updateGameInfo(message);
     this.ui.updateCommentary(message);
     this.ui.highlightPlacementBoard();
@@ -1046,7 +1411,15 @@ startNewGame(mode) {
       if (this.gameState.isPlacementComplete()) {
         // Hide undo button
         document.getElementById('undoMove').style.display = 'none';
-        
+
+        // Sync ship placement with Firebase for online mode
+        if (this.gameState.gameMode === 'online') {
+          this.multiplayer.syncShipPlacement(this.gameState.boards.player);
+          this.multiplayer.updateReady(true);
+          this.ui.updateCommentary('Ships placed! Waiting for opponent to finish setup...');
+          return;
+        }
+
         setTimeout(() => {
           if (this.gameState.gameMode === 'human') {
             if (this.gameState.currentPlayer === 1) {
@@ -1105,10 +1478,10 @@ startCombatPhase() {
     section.classList.remove('placement-active');
   });
 
-  if (this.gameState.gameMode === 'ai') {
-    const opponentBoards = document.querySelector('.opponent-boards');
-    opponentBoards.style.display = 'block';
+  const opponentBoards = document.querySelector('.opponent-boards');
+  opponentBoards.style.display = 'block';
 
+  if (this.gameState.gameMode === 'ai') {
     this.gameState.ships.opponent = this.gameState.createInitialShips();
     this.gameState.boards.opponent = this.gameState.createEmptyBoards();
     this.placeAIShips();
@@ -1132,11 +1505,32 @@ startCombatPhase() {
         });
       });
     }, 100);
+  } else if (this.gameState.gameMode === 'online') {
+    // For online mode, opponent boards are already created but hidden
+    this.gameState.ships.opponent = this.gameState.createInitialShips();
+    this.gameState.boards.opponent = this.gameState.createEmptyBoards();
+
+    // Restart animations
+    setTimeout(() => {
+      document.querySelectorAll('.opponent-boards .board').forEach(board => {
+        const clone = board.cloneNode(true);
+        board.parentNode.replaceChild(clone, board);
+      });
+
+      // Re-attach click listeners
+      document.querySelectorAll('.opponent-boards .cell').forEach(cell => {
+        cell.addEventListener('click', (e) => {
+          if (this.gameState.phase === 'combat') {
+            this.handleAttack(e);
+          }
+        });
+      });
+    }, 100);
   }
-  
+
   // Place treasure chests AFTER AI ships are placed
   this.gameState.placeTreasureChests();
-  
+
   this.ui.updateGameInfo('Combat phase - Attack your opponent\'s board!');
 }
 
@@ -1180,25 +1574,36 @@ startCombatPhase() {
     }
   }
 
-handleAttack(e) {
+async handleAttack(e) {
     // Early exit if not in combat phase or already processing a turn
     if (this.gameState.phase !== 'combat' || this.isProcessingTurn) return;
-    
+
     const cell = e.target;
     const boardId = cell.closest('.board').id;
-    
+
     // *** IMPORTANT ADDITION: Don't process normal attacks if a powerup is pending ***
     if (this.gameState.pendingPowerup) {
         console.log("Pending powerup detected, skipping normal attack");
         return;
     }
-    
+
+    // Online mode: check if it's our turn
+    if (this.gameState.gameMode === 'online') {
+      const isMyTurn = await this.multiplayer.isMyTurn();
+      if (!isMyTurn) {
+        this.ui.updateCommentary("Wait for your turn!");
+        return;
+      }
+      // Only allow attacking opponent board
+      if (!boardId.includes('opponent')) return;
+    }
+
     // Validate correct player is attacking the correct board
     if (this.gameState.gameMode === 'human') {
       // For PvP, player 1 attacks opponent board, player 2 attacks player board
       if (this.gameState.currentPlayer === 1 && !boardId.includes('opponent')) return;
       if (this.gameState.currentPlayer === 2 && !boardId.includes('player')) return;
-    } else {
+    } else if (this.gameState.gameMode === 'ai') {
       // For AI game, player only attacks opponent board
       if (!boardId.includes('opponent')) return;
     }
@@ -1251,6 +1656,12 @@ handleAttack(e) {
     this.sound.playSound(result.hit ? 'hit' : 'miss');
     this.ui.updateBoard(result);
 
+    // Send move to Firebase for online mode
+    if (this.gameState.gameMode === 'online') {
+      const resultType = result.hit ? (result.sunk ? 'sunk' : 'hit') : 'miss';
+      await this.multiplayer.sendMove(layer, index, resultType);
+    }
+
     // Update commentary with ship-specific messaging
     if (result.hit) {
       if (result.sunk) {
@@ -1259,6 +1670,8 @@ handleAttack(e) {
           this.ui.updateCommentary(`You destroyed AI's ${result.shipType}!`);
         } else if (this.gameState.gameMode === 'human') {
           this.ui.updateCommentary(`Player ${this.gameState.currentPlayer} destroyed a ${result.shipType}!`);
+        } else if (this.gameState.gameMode === 'online') {
+          this.ui.updateCommentary(`You destroyed opponent's ${result.shipType}!`);
         }
       } else {
         // Ship hit message
@@ -1266,6 +1679,8 @@ handleAttack(e) {
           this.ui.updateCommentary(`You hit AI's ${result.shipType}! Attack again.`);
         } else if (this.gameState.gameMode === 'human') {
           this.ui.updateCommentary(`Player ${this.gameState.currentPlayer} hit a ${result.shipType}! Attack again.`);
+        } else if (this.gameState.gameMode === 'online') {
+          this.ui.updateCommentary(`You hit opponent's ${result.shipType}! Attack again.`);
         }
       }
       this.animateCommentaryBox();
@@ -1275,6 +1690,8 @@ handleAttack(e) {
         this.ui.updateCommentary("You missed! AI's turn.");
       } else if (this.gameState.gameMode === 'human') {
         this.ui.updateCommentary(`Player ${this.gameState.currentPlayer} missed!`);
+      } else if (this.gameState.gameMode === 'online') {
+        this.ui.updateCommentary("You missed! Opponent's turn.");
       }
     }
 
