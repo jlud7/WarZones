@@ -1105,10 +1105,11 @@ startCombatPhase() {
     section.classList.remove('placement-active');
   });
 
-  if (this.gameState.gameMode === 'ai') {
-    const opponentBoards = document.querySelector('.opponent-boards');
-    opponentBoards.style.display = 'block';
+  // Ensure opponent boards are visible for both game modes
+  const opponentBoards = document.querySelector('.opponent-boards');
+  opponentBoards.style.display = 'block';
 
+  if (this.gameState.gameMode === 'ai') {
     this.gameState.ships.opponent = this.gameState.createInitialShips();
     this.gameState.boards.opponent = this.gameState.createEmptyBoards();
     this.placeAIShips();
