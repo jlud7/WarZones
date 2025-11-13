@@ -1763,17 +1763,29 @@ async handleAttack(e) {
       if (!result.hit) {
         // Switch players on miss
         this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
-        
+
         // Update UI to show current player
         this.updateUIForPlayerTurn();
-        
+
         this.ui.updateGameInfo(`Miss! It's Player ${this.gameState.currentPlayer}'s turn.`);
       } else {
         // Continue turn on hit in PvP mode
         this.ui.updateGameInfo(`Hit! Player ${this.gameState.currentPlayer}, attack again!`);
       }
-      
+
       // Reset the processing flag for human vs human mode
+      this.isProcessingTurn = false;
+    } else if (this.gameState.gameMode === 'online') {
+      // Online mode: turn handled by Firebase sync
+      if (!result.hit) {
+        // On miss, turn switches (handled by Firebase in sendMove)
+        this.ui.updateGameInfo("Miss! Opponent's turn.");
+      } else {
+        // On hit, player continues
+        this.ui.updateGameInfo("Hit! Attack again!");
+      }
+
+      // Reset processing flag
       this.isProcessingTurn = false;
     }
   }
