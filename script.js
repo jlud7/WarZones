@@ -290,17 +290,57 @@ class FirebaseMultiplayer {
     }
   }
 
-  startOnlineGame() {
+  async startOnlineGame() {
     this.isOnlineMode = true;
     this.game.gameState.gameMode = 'online';
-    this.game.gameState.phase = 'combat';
-    this.game.ui.updateCommentary('Both players ready! Game starting...');
+    this.game.ui.updateCommentary('Both players ready! Loading opponent...');
+
+    // Load opponent's ship positions from Firebase
+    await this.loadOpponentBoards();
+
+    // Start combat phase
+    this.game.startCombatPhase();
 
     // Determine who goes first
     if (this.playerRole === 'player1') {
       this.game.ui.updateCommentary("You go first! Attack opponent's board.");
     } else {
       this.game.ui.updateCommentary("Opponent goes first. Wait for their move.");
+    }
+  }
+
+  async loadOpponentBoards() {
+    if (!this.currentRoom || !this.database) return;
+
+    try {
+      const opponentRole = this.playerRole === 'player1' ? 'player2' : 'player1';
+      const opponentBoardsRef = this.database.ref(`rooms/${this.currentRoom}/${opponentRole}/boards`);
+      const snapshot = await opponentBoardsRef.once('value');
+      const opponentBoards = snapshot.val();
+
+      if (opponentBoards) {
+        // Load opponent's boards
+        this.game.gameState.boards.opponent = opponentBoards;
+
+        // Rebuild opponent ships from board data
+        this.game.gameState.ships.opponent = this.game.gameState.createInitialShips();
+
+        // Scan boards to find ship positions
+        Object.keys(opponentBoards).forEach(layer => {
+          opponentBoards[layer].forEach((cell, index) => {
+            if (cell && cell !== 'hit' && cell !== 'miss' && cell !== 'Treasure') {
+              const shipType = cell;
+              if (this.game.gameState.ships.opponent[shipType]) {
+                if (!this.game.gameState.ships.opponent[shipType].positions.includes(index)) {
+                  this.game.gameState.ships.opponent[shipType].positions.push(index);
+                }
+              }
+            }
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error loading opponent boards:', error);
     }
   }
 
@@ -1518,9 +1558,8 @@ startCombatPhase() {
       });
     }, 100);
   } else if (this.gameState.gameMode === 'online') {
-    // For online mode, opponent boards are already created but hidden
-    this.gameState.ships.opponent = this.gameState.createInitialShips();
-    this.gameState.boards.opponent = this.gameState.createEmptyBoards();
+    // For online mode, opponent boards were already loaded from Firebase
+    // Don't overwrite them! Just set up the UI
 
     // Restart animations
     setTimeout(() => {
@@ -1540,8 +1579,10 @@ startCombatPhase() {
     }, 100);
   }
 
-  // Place treasure chests AFTER AI ships are placed
-  this.gameState.placeTreasureChests();
+  // Place treasure chests (only for AI mode, online mode already has them synced)
+  if (this.gameState.gameMode === 'ai') {
+    this.gameState.placeTreasureChests();
+  }
 
   this.ui.updateGameInfo('Combat phase - Attack your opponent\'s board!');
 }
