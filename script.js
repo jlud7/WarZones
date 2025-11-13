@@ -1225,13 +1225,20 @@ handleAttack(e) {
     });
 
     if (boardId.includes('opponent')) {
-      // Player found a treasure chest.
-      this.ui.updateCommentary("You found a treasure chest!");
+      // Player 1 found a treasure chest (or the human player in AI mode)
+      const playerName = this.gameState.gameMode === 'human' ? `Player ${this.gameState.currentPlayer}` : 'You';
+      this.ui.updateCommentary(`${playerName} found a treasure chest!`);
       this.animateCommentaryBox();
       this.ui.showTreasureMenu();
       this.isProcessingTurn = false; // Let the player choose a power-up.
+    } else if (this.gameState.gameMode === 'human') {
+      // Player 2 found a treasure chest in PvP mode
+      this.ui.updateCommentary(`Player ${this.gameState.currentPlayer} found a treasure chest!`);
+      this.animateCommentaryBox();
+      this.ui.showTreasureMenu();
+      this.isProcessingTurn = false; // Let Player 2 choose a power-up.
     } else {
-      // AI found a treasure chest.
+      // AI found a treasure chest (only in AI mode)
       this.ui.updateCommentary("AI found a treasure chest!");
       this.animateCommentaryBox();
       setTimeout(() => {
