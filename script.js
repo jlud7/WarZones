@@ -296,7 +296,13 @@ class FirebaseMultiplayer {
     this.game.ui.updateCommentary('Both players ready! Loading opponent...');
 
     // Load opponent's ship positions from Firebase
-    await this.loadOpponentBoards();
+    const loaded = await this.loadOpponentBoards();
+
+    if (!loaded) {
+      console.error('CRITICAL: Failed to load opponent boards - game cannot start!');
+      this.game.ui.updateCommentary('ERROR: Could not sync with opponent. Check console and Firebase rules.');
+      return;
+    }
 
     // Start combat phase
     this.game.startCombatPhase();
@@ -310,15 +316,22 @@ class FirebaseMultiplayer {
   }
 
   async loadOpponentBoards() {
-    if (!this.currentRoom || !this.database) return;
+    if (!this.currentRoom || !this.database) {
+      console.error('Cannot load opponent boards: no room or database');
+      return false;
+    }
 
     try {
       const opponentRole = this.playerRole === 'player1' ? 'player2' : 'player1';
+      console.log(`Loading ${opponentRole} boards from room ${this.currentRoom}`);
+
       const opponentBoardsRef = this.database.ref(`rooms/${this.currentRoom}/${opponentRole}/boards`);
       const snapshot = await opponentBoardsRef.once('value');
       const opponentBoards = snapshot.val();
 
       if (opponentBoards) {
+        console.log('Opponent boards loaded successfully:', opponentBoards);
+
         // Load opponent's boards
         this.game.gameState.boards.opponent = opponentBoards;
 
@@ -338,9 +351,18 @@ class FirebaseMultiplayer {
             }
           });
         });
+
+        console.log('Opponent ships reconstructed:', this.game.gameState.ships.opponent);
+        return true;
+      } else {
+        console.error('Opponent boards are null - Firebase read may have failed due to security rules');
+        this.game.ui.updateCommentary('ERROR: Could not load opponent data. Check Firebase rules!');
+        return false;
       }
     } catch (error) {
       console.error('Error loading opponent boards:', error);
+      this.game.ui.updateCommentary('ERROR: Firebase connection failed!');
+      return false;
     }
   }
 
