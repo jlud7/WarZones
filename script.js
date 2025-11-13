@@ -1055,8 +1055,11 @@ startNewGame(mode) {
               this.gameState.currentShipIndex = 0;
               this.gameState.phase = 'setup';
               this.gameState.currentPlayer = 2;
-              
+
               // Update UI for player 2
+              // Ensure both boards remain visible
+              document.querySelector('.player-boards').style.display = 'block';
+              document.querySelector('.opponent-boards').style.display = 'block';
               document.querySelector('.player-boards').classList.remove('active');
               document.querySelector('.opponent-boards').classList.add('active');
               document.querySelectorAll('.player-score')[0].classList.remove('active');
@@ -1358,6 +1361,12 @@ handleAttack(e) {
   }
   
   updateUIForPlayerTurn() {
+    // Ensure both boards remain visible in PvP mode
+    if (this.gameState.gameMode === 'human') {
+      document.querySelector('.player-boards').style.display = 'block';
+      document.querySelector('.opponent-boards').style.display = 'block';
+    }
+
     if (this.gameState.currentPlayer === 1) {
       document.querySelector('.player-boards').classList.add('active');
       document.querySelector('.opponent-boards').classList.remove('active');
