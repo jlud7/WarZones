@@ -48,12 +48,19 @@ POWERUPS: {
 class FirebaseMultiplayer {
   constructor(game) {
     this.game = game;
-    this.database = firebase.database();
+    this.database = null;
     this.currentRoom = null;
     this.playerRole = null; // 'player1' or 'player2'
     this.playerId = this.generatePlayerId();
     this.roomListeners = [];
     this.isOnlineMode = false;
+  }
+
+  initDatabase() {
+    if (!this.database && typeof firebase !== 'undefined') {
+      this.database = firebase.database();
+    }
+    return this.database !== null;
   }
 
   generatePlayerId() {
@@ -74,6 +81,10 @@ class FirebaseMultiplayer {
 
     if (roomCode.length !== 7) {
       return { success: false, error: 'Room code must be 7 characters' };
+    }
+
+    if (!this.initDatabase()) {
+      return { success: false, error: 'Firebase not loaded. Please refresh the page.' };
     }
 
     try {
@@ -127,6 +138,7 @@ class FirebaseMultiplayer {
   }
 
   setupRoomListeners(roomCode) {
+    if (!this.database) return;
     const roomRef = this.database.ref('rooms/' + roomCode);
 
     // Listen for opponent joining
@@ -184,7 +196,7 @@ class FirebaseMultiplayer {
   }
 
   async updateReady(isReady) {
-    if (!this.currentRoom || !this.playerRole) return;
+    if (!this.currentRoom || !this.playerRole || !this.database) return;
 
     try {
       await this.database.ref(`rooms/${this.currentRoom}/${this.playerRole}/ready`).set(isReady);
@@ -205,7 +217,7 @@ class FirebaseMultiplayer {
   }
 
   async syncShipPlacement(boards) {
-    if (!this.currentRoom || !this.playerRole) return;
+    if (!this.currentRoom || !this.playerRole || !this.database) return;
 
     try {
       // Only sync ship positions (hidden from opponent)
@@ -216,7 +228,7 @@ class FirebaseMultiplayer {
   }
 
   async sendMove(layer, cellIndex, result) {
-    if (!this.currentRoom || !this.playerRole) return;
+    if (!this.currentRoom || !this.playerRole || !this.database) return;
 
     try {
       const moveRef = this.database.ref(`rooms/${this.currentRoom}/moves`).push();
@@ -261,7 +273,7 @@ class FirebaseMultiplayer {
   }
 
   async checkCurrentTurn() {
-    if (!this.currentRoom) return;
+    if (!this.currentRoom || !this.database) return;
 
     try {
       const turnRef = this.database.ref(`rooms/${this.currentRoom}/currentTurn`);
@@ -293,7 +305,7 @@ class FirebaseMultiplayer {
   }
 
   async leaveRoom() {
-    if (!this.currentRoom || !this.playerRole) return;
+    if (!this.currentRoom || !this.playerRole || !this.database) return;
 
     try {
       // Mark as disconnected
@@ -320,7 +332,7 @@ class FirebaseMultiplayer {
   }
 
   async isMyTurn() {
-    if (!this.currentRoom || !this.isOnlineMode) return true;
+    if (!this.currentRoom || !this.isOnlineMode || !this.database) return true;
 
     try {
       const turnRef = this.database.ref(`rooms/${this.currentRoom}/currentTurn`);
