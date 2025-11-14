@@ -912,13 +912,25 @@ aiUseCannonBall() {
     // Add click listeners to cells
     document.querySelectorAll('.cell').forEach(cell => {
       cell.addEventListener('click', (e) => {
+        const boardId = e.target.closest('.board').id;
+        console.log('🖱️ [CELL CLICK] Cell clicked - boardId:', boardId, 'phase:', this.gameState.phase, 'gameMode:', this.gameState.gameMode, 'currentPlayer:', this.gameState.currentPlayer);
+
         if (this.gameState.phase === 'setup') {
-          const boardId = e.target.closest('.board').id;
-          if (this.gameState.gameMode === 'ai' && !boardId.includes('player')) return;
-          if (this.gameState.gameMode === 'human') {
-            if (this.gameState.currentPlayer === 1 && !boardId.includes('player')) return;
-            if (this.gameState.currentPlayer === 2 && !boardId.includes('opponent')) return;
+          if (this.gameState.gameMode === 'ai' && !boardId.includes('player')) {
+            console.log('❌ [CELL CLICK] AI mode - blocking click on opponent board during setup');
+            return;
           }
+          if (this.gameState.gameMode === 'human') {
+            if (this.gameState.currentPlayer === 1 && !boardId.includes('player')) {
+              console.log('❌ [CELL CLICK] Player 1 clicked opponent board during setup - blocking');
+              return;
+            }
+            if (this.gameState.currentPlayer === 2 && !boardId.includes('opponent')) {
+              console.log('❌ [CELL CLICK] Player 2 clicked player board during setup - blocking');
+              return;
+            }
+          }
+          console.log('✅ [CELL CLICK] Click allowed, calling handleShipPlacement');
           const index = parseInt(e.target.dataset.index);
           const layer = e.target.dataset.layer;
           this.handleShipPlacement(boardId, index, layer);
@@ -1026,7 +1038,14 @@ startNewGame(mode) {
   }
 
   handleShipPlacement(boardId, index, layer) {
-    if (this.gameState.phase !== 'setup') return;
+    console.log('🚢 [PLACEMENT] handleShipPlacement called - boardId:', boardId, 'index:', index, 'layer:', layer);
+    console.log('🚢 [PLACEMENT] Current state - phase:', this.gameState.phase, 'gameMode:', this.gameState.gameMode, 'currentPlayer:', this.gameState.currentPlayer, 'currentShipIndex:', this.gameState.currentShipIndex);
+
+    if (this.gameState.phase !== 'setup') {
+      console.log('❌ [PLACEMENT] Not in setup phase, returning');
+      return;
+    }
+
     const result = this.gameState.placeShip(boardId, index, layer);
     
     if (result.success) {
@@ -1054,17 +1073,24 @@ startNewGame(mode) {
       }
       
       if (this.gameState.isPlacementComplete()) {
+        console.log('✅ [PLACEMENT] All ships placed for current player');
+        console.log('✅ [PLACEMENT] gameMode:', this.gameState.gameMode, 'currentPlayer:', this.gameState.currentPlayer);
+
         // Hide undo button
         document.getElementById('undoMove').style.display = 'none';
-        
+
         setTimeout(() => {
           if (this.gameState.gameMode === 'human') {
             if (this.gameState.currentPlayer === 1) {
+              console.log('🔄 [PLACEMENT] Player 1 finished - switching to Player 2 setup');
+
               // Switch to player 2 setup
               this.ui.hideShips('player');
               this.gameState.currentShipIndex = 0;
               this.gameState.phase = 'setup';
               this.gameState.currentPlayer = 2;
+
+              console.log('🔄 [PLACEMENT] After switch - phase:', this.gameState.phase, 'currentPlayer:', this.gameState.currentPlayer, 'currentShipIndex:', this.gameState.currentShipIndex);
               
               // Update UI for player 2
               document.querySelector('.player-boards').classList.remove('active');
@@ -1080,6 +1106,8 @@ startNewGame(mode) {
               
               document.getElementById('undoMove').style.display = 'inline-block';
             } else {
+              console.log('🎮 [PLACEMENT] Player 2 finished - starting combat phase');
+
               // Both players have placed ships, start combat
               this.ui.hideShips('player');
               this.ui.hideShips('opponent');
@@ -1107,8 +1135,12 @@ startNewGame(mode) {
   }
 
 startCombatPhase() {
+  console.log('⚔️ [COMBAT START] Starting combat phase - gameMode:', this.gameState.gameMode);
+
   this.gameState.phase = 'combat';
   this.gameState.currentPlayer = 1; // Always start with player 1 in combat
+
+  console.log('⚔️ [COMBAT START] Phase set to combat, currentPlayer set to 1');
 
   // Clear placement highlights
   document.querySelectorAll('.board-section.placement-active').forEach(section => {
@@ -1116,6 +1148,7 @@ startCombatPhase() {
   });
 
   if (this.gameState.gameMode === 'ai') {
+    console.log('⚔️ [COMBAT START] AI mode - placing AI ships');
     const opponentBoards = document.querySelector('.opponent-boards');
     opponentBoards.style.display = 'block';
 
@@ -1142,12 +1175,16 @@ startCombatPhase() {
         });
       });
     }, 100);
+  } else {
+    console.log('⚔️ [COMBAT START] Human mode - both players have placed ships, starting combat');
   }
-  
-  // Place treasure chests AFTER AI ships are placed
+
+  // Place treasure chests AFTER AI ships are placed (or after both players have placed in human mode)
   this.gameState.placeTreasureChests();
-  
+  console.log('⚔️ [COMBAT START] Treasure chests placed');
+
   this.ui.updateGameInfo('Combat phase - Attack your opponent\'s board!');
+  console.log('⚔️ [COMBAT START] Combat phase setup complete');
 }
 
   placeAIShips() {
@@ -1983,12 +2020,17 @@ placeTreasureChests() {
   
   placeShip(boardId, index, layer) {
     const shipType = this.getCurrentShip();
+    console.log('🛠️ [PLACE SHIP] Attempting to place ship - shipType:', shipType, 'boardId:', boardId, 'layer:', layer);
+
     if (!this.isValidPlacement(boardId, index, layer, shipType)) {
+      console.log('❌ [PLACE SHIP] Invalid placement');
       return { success: false };
     }
-    
+
     const positions = this.calculateShipPositions(index, shipType);
     const isPlayer = boardId.includes('player');
+    console.log('🛠️ [PLACE SHIP] Placement valid - isPlayer:', isPlayer, 'positions:', positions);
+
     const shipData = isPlayer ? this.ships.player[shipType] : this.ships.opponent[shipType];
     
     // Store ship positions
