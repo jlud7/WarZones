@@ -44,6 +44,194 @@ POWERUPS: {
 }
 };
 
+/* --- Multiplayer Manager --- */
+class MultiplayerManager {
+  constructor(game) {
+    this.game = game;
+    this.peer = null;
+    this.connection = null;
+    this.isHost = false;
+    this.isConnected = false;
+    this.myPlayerNumber = null; // 1 or 2
+    this.roomCode = null;
+  }
+
+  initialize() {
+    console.log('🌐 [MULTIPLAYER] Initializing PeerJS...');
+    this.peer = new Peer();
+
+    this.peer.on('open', (id) => {
+      console.log('🌐 [MULTIPLAYER] Peer ID:', id);
+      this.roomCode = id.substr(0, 6).toUpperCase();
+    });
+
+    this.peer.on('connection', (conn) => {
+      console.log('🌐 [MULTIPLAYER] Incoming connection from:', conn.peer);
+      this.connection = conn;
+      this.setupConnection();
+      this.onConnectionEstablished();
+    });
+
+    this.peer.on('error', (err) => {
+      console.error('🌐 [MULTIPLAYER] PeerJS error:', err);
+      alert('Connection error: ' + err.type);
+    });
+  }
+
+  hostGame() {
+    console.log('🌐 [MULTIPLAYER] Hosting game...');
+    this.initialize();
+    this.isHost = true;
+    this.myPlayerNumber = 1;
+
+    // Wait for peer to be ready, then show room code
+    const checkReady = setInterval(() => {
+      if (this.roomCode) {
+        clearInterval(checkReady);
+        document.getElementById('roomCode').textContent = this.roomCode;
+        document.querySelector('.menu-buttons').style.display = 'none';
+        document.getElementById('roomCodeDisplay').style.display = 'block';
+        console.log('🌐 [MULTIPLAYER] Room code:', this.roomCode);
+      }
+    }, 100);
+  }
+
+  joinGame(roomCode) {
+    console.log('🌐 [MULTIPLAYER] Joining game with code:', roomCode);
+    this.initialize();
+    this.isHost = false;
+    this.myPlayerNumber = 2;
+
+    // Wait for peer to be initialized
+    const attemptConnection = setInterval(() => {
+      if (this.peer && this.peer.id) {
+        clearInterval(attemptConnection);
+        // Reconstruct the full peer ID from the room code
+        const peerId = roomCode.toLowerCase();
+        console.log('🌐 [MULTIPLAYER] Connecting to peer:', peerId);
+        this.connection = this.peer.connect(peerId);
+        this.setupConnection();
+      }
+    }, 100);
+  }
+
+  setupConnection() {
+    this.connection.on('open', () => {
+      console.log('🌐 [MULTIPLAYER] Connection established!');
+      this.isConnected = true;
+      this.onConnectionEstablished();
+    });
+
+    this.connection.on('data', (data) => {
+      console.log('🌐 [MULTIPLAYER] Received data:', data);
+      this.handleIncomingData(data);
+    });
+
+    this.connection.on('close', () => {
+      console.log('🌐 [MULTIPLAYER] Connection closed');
+      this.isConnected = false;
+      alert('Connection lost! Your opponent disconnected.');
+    });
+
+    this.connection.on('error', (err) => {
+      console.error('🌐 [MULTIPLAYER] Connection error:', err);
+    });
+  }
+
+  onConnectionEstablished() {
+    if (!this.isConnected) return;
+
+    console.log('🌐 [MULTIPLAYER] Both players connected! Starting game...');
+    console.log('🌐 [MULTIPLAYER] I am Player', this.myPlayerNumber);
+
+    // Hide menu and start game
+    document.getElementById('gameMenu').style.display = 'none';
+
+    // Set player names
+    if (this.myPlayerNumber === 1) {
+      document.getElementById('player2Name').textContent = "Player 2";
+      document.getElementById('player2Icon').textContent = "👤";
+      document.getElementById('opponentTitle').textContent = "Player 2";
+    } else {
+      document.getElementById('player1Name') && (document.querySelector('.player-score:first-child .player-name').textContent = "Player 1");
+      document.getElementById('player2Name').textContent = "You (P2)";
+    }
+
+    // Start the online game
+    this.game.gameState.gameMode = 'online';
+    this.game.gameState.isOnlineMultiplayer = true;
+    this.game.startNewGame('online');
+  }
+
+  send(data) {
+    if (this.isConnected && this.connection) {
+      console.log('🌐 [MULTIPLAYER] Sending data:', data);
+      this.connection.send(data);
+    } else {
+      console.error('🌐 [MULTIPLAYER] Cannot send - not connected');
+    }
+  }
+
+  handleIncomingData(data) {
+    switch (data.type) {
+      case 'shipPlacement':
+        console.log('🌐 [MULTIPLAYER] Opponent placed ship:', data);
+        this.game.handleOpponentShipPlacement(data);
+        break;
+
+      case 'attack':
+        console.log('🌐 [MULTIPLAYER] Opponent attacked:', data);
+        this.game.handleOpponentAttack(data);
+        break;
+
+      case 'gameStart':
+        console.log('🌐 [MULTIPLAYER] Opponent ready for combat');
+        this.game.handleOpponentReady();
+        break;
+
+      default:
+        console.warn('🌐 [MULTIPLAYER] Unknown data type:', data.type);
+    }
+  }
+
+  sendShipPlacement(boardId, index, layer, shipType, positions) {
+    this.send({
+      type: 'shipPlacement',
+      boardId,
+      index,
+      layer,
+      shipType,
+      positions
+    });
+  }
+
+  sendAttack(boardId, index, layer, result) {
+    this.send({
+      type: 'attack',
+      boardId,
+      index,
+      layer,
+      result
+    });
+  }
+
+  sendGameStart() {
+    this.send({
+      type: 'gameStart'
+    });
+  }
+
+  destroy() {
+    if (this.connection) {
+      this.connection.close();
+    }
+    if (this.peer) {
+      this.peer.destroy();
+    }
+    this.isConnected = false;
+  }
+}
+
 class WarZones {
   constructor() {
     this.gameState = new GameState();
@@ -57,6 +245,7 @@ class WarZones {
     this.aiWins = 0;
     this.aiTurnTimeouts = []; // Track AI turn timeouts
     this.isProcessingTurn = false; // Flag to prevent multiple attacks
+    this.multiplayer = new MultiplayerManager(this); // Add multiplayer manager
 
     // Also set a global reference that can be used as fallback
     window.warZonesGame = this;
@@ -953,7 +1142,7 @@ aiUseCannonBall() {
     });
 
     document.getElementById('playVsHuman').addEventListener('click', () => {
-      console.log('🎮 [GAME MODE] Play vs Human button clicked');
+      console.log('🎮 [GAME MODE] Play vs Human (Local) button clicked');
       this.sound.initialize();
       this.gameState.gameMode = 'human';
       console.log('🎮 [GAME MODE] Game mode set to:', this.gameState.gameMode);
@@ -961,7 +1150,35 @@ aiUseCannonBall() {
       document.getElementById('player2Icon').textContent = "👤";
       this.startNewGame('human');
     });
-    
+
+    document.getElementById('hostOnlineGame').addEventListener('click', () => {
+      console.log('🎮 [GAME MODE] Host Online Game button clicked');
+      this.sound.initialize();
+      this.multiplayer.hostGame();
+    });
+
+    document.getElementById('joinOnlineGame').addEventListener('click', () => {
+      console.log('🎮 [GAME MODE] Join Online Game button clicked');
+      this.sound.initialize();
+      document.querySelector('.menu-buttons').style.display = 'none';
+      document.getElementById('roomCodeSection').style.display = 'block';
+    });
+
+    document.getElementById('confirmJoin').addEventListener('click', () => {
+      const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+      if (roomCode.length >= 4) {
+        this.multiplayer.joinGame(roomCode);
+      } else {
+        alert('Please enter a valid room code');
+      }
+    });
+
+    document.getElementById('cancelJoin').addEventListener('click', () => {
+      document.getElementById('roomCodeSection').style.display = 'none';
+      document.querySelector('.menu-buttons').style.display = 'flex';
+      document.getElementById('roomCodeInput').value = '';
+    });
+
     document.getElementById('orientationButton').addEventListener('click', () => this.rotateShip());
     document.getElementById('toggleSound').addEventListener('click', () => this.sound.toggleSound());
     document.getElementById('resetGame').addEventListener('click', () => this.startNewGame('ai'));
@@ -1014,6 +1231,22 @@ startNewGame(mode) {
       // Update title for player 2's board
       document.getElementById('opponentTitle').textContent = "Player 2";
       this.uiUpdateForHumanPlacement();
+    } else if (mode === 'online') {
+      // Online multiplayer mode
+      console.log('🆕 [START GAME] Online mode - myPlayerNumber:', this.multiplayer.myPlayerNumber);
+      this.gameState.gameMode = 'online';
+      this.gameState.currentPlayer = this.multiplayer.myPlayerNumber;
+
+      const playerBoards = document.querySelector('.player-boards');
+      const opponentBoards = document.querySelector('.opponent-boards');
+
+      playerBoards.style.display = 'block';
+      opponentBoards.style.display = 'block';
+      playerBoards.style.pointerEvents = 'auto';
+      opponentBoards.style.pointerEvents = 'none';
+
+      document.getElementById('undoMove').style.display = 'inline-block';
+      document.getElementById('opponentTitle').textContent = "Opponent";
     } else {
       this.gameState.gameMode = 'ai';
       document.querySelector('.player-boards').style.display = 'block';
@@ -1022,16 +1255,18 @@ startNewGame(mode) {
       // Update title for AI's board
       document.getElementById('opponentTitle').textContent = "AI";
     }
-    
+
     this.ui.clearBoards();
     this.createGameBoards();
     this.sound.playSound('gameStart');
     this.ui.updateScoreBoard();
-    
-    const message = mode === 'ai' 
+
+    const message = mode === 'online'
       ? 'Place your ships on your board.'
-      : 'Player One: Place your ships on your board.';
-    
+      : mode === 'ai'
+        ? 'Place your ships on your board.'
+        : 'Player One: Place your ships on your board.';
+
     this.ui.updateGameInfo(message);
     this.ui.updateCommentary(message);
     this.ui.highlightPlacementBoard();
@@ -1061,10 +1296,17 @@ startNewGame(mode) {
     
     if (result.success) {
       this.sound.playSound('place');
+
+      // Send placement to opponent in online mode
+      if (this.gameState.gameMode === 'online' && this.multiplayer.isConnected) {
+        console.log('🌐 [SEND] Sending ship placement to opponent');
+        this.multiplayer.sendShipPlacement(boardId, index, layer, result.shipType, result.positions);
+      }
+
       document.querySelectorAll(`#${boardId} .cell`).forEach(cell => {
         cell.classList.remove('valid-placement', 'invalid-placement');
       });
-      
+
       result.positions.forEach(pos => {
         const cell = document.querySelector(`#${boardId} .cell[data-index="${pos}"]`);
         if (cell) {
@@ -1072,7 +1314,7 @@ startNewGame(mode) {
           cell.textContent = GAME_CONSTANTS.SHIPS[result.shipType].symbol;
         }
       });
-      
+
       // Update the commentary
       const nextShip = this.gameState.getCurrentShip();
       if (nextShip) {
@@ -1150,11 +1392,19 @@ startNewGame(mode) {
 
               document.querySelectorAll('.player-score')[0].classList.add('active');
               document.querySelectorAll('.player-score')[1].classList.remove('active');
-              
+
               // Update commentary for combat
               this.ui.updateCommentary('Combat phase - Player 1, attack your opponent\'s board!');
               this.animateCommentaryBox();
             }
+          } else if (this.gameState.gameMode === 'online') {
+            // Online game - notify opponent we're ready
+            console.log('🌐 [PLACEMENT] Finished placing ships in online mode');
+            this.ui.hideShips('player');
+            document.getElementById('undoMove').style.display = 'none';
+            this.multiplayer.sendGameStart();
+            this.ui.updateCommentary('Waiting for opponent to finish placing ships...');
+            this.animateCommentaryBox();
           } else {
             // AI game - player has placed all ships
             this.startCombatPhase();
@@ -1305,7 +1555,13 @@ handleAttack(e) {
     this.isProcessingTurn = true;
 
     const result = this.gameState.processAttack(boardId, index, layer);
-    
+
+    // Send attack to opponent in online mode
+    if (this.gameState.gameMode === 'online' && this.multiplayer.isConnected) {
+      console.log('🌐 [SEND] Sending attack to opponent');
+      this.multiplayer.sendAttack(boardId, index, layer, result);
+    }
+
     // Handle treasure chest discovery
     if (result.treasure) {
     this.sound.playSound('hit');
@@ -1884,6 +2140,72 @@ class Statistics {
   
   saveStats() {
     localStorage.setItem('warZonesStats', JSON.stringify(this.stats));
+  }
+
+  // Multiplayer handlers
+  handleOpponentShipPlacement(data) {
+    console.log('🌐 [OPPONENT ACTION] Received ship placement:', data);
+
+    // Convert opponent board names to our board names
+    // Opponent's "player" board is our "opponent" board
+    const targetBoardId = data.boardId.replace('player', 'opponent');
+
+    // Place ship on opponent's board
+    const board = this.gameState.boards.opponent;
+    const shipData = this.gameState.ships.opponent[data.shipType];
+
+    shipData.positions = data.positions;
+    data.positions.forEach(pos => {
+      board[data.layer][pos] = data.shipType;
+    });
+
+    // Update ship index
+    this.gameState.currentShipIndex++;
+
+    console.log('🌐 [OPPONENT ACTION] Opponent ship placed. Current ship index:', this.gameState.currentShipIndex);
+  }
+
+  handleOpponentAttack(data) {
+    console.log('🌐 [OPPONENT ACTION] Received attack:', data);
+
+    // The opponent attacked their "opponent" board, which is our "player" board
+    const cell = document.querySelector(`#player${data.layer}Board .cell[data-index="${data.index}"]`);
+
+    if (cell) {
+      if (data.result.hit) {
+        cell.classList.add('hit');
+        if (data.result.treasure) {
+          cell.textContent = '💎';
+        }
+      } else {
+        cell.classList.add('miss');
+      }
+
+      // Update visual state
+      this.ui.updateBoard({
+        boardId: `player${data.layer}Board`,
+        index: data.index,
+        hit: data.result.hit,
+        sunk: data.result.sunk,
+        shipType: data.result.shipType
+      });
+
+      this.sound.playSound(data.result.hit ? 'hit' : 'miss');
+    }
+
+    // Switch turns if needed
+    if (this.gameState.gameMode === 'online') {
+      // Opponent's turn ended, now it's our turn
+      console.log('🌐 [TURN] Opponent attack processed, switching to our turn');
+    }
+  }
+
+  handleOpponentReady() {
+    console.log('🌐 [OPPONENT ACTION] Opponent finished placing ships, starting combat');
+    // Both players are ready, start combat phase
+    if (this.gameState.isPlacementComplete()) {
+      this.startCombatPhase();
+    }
   }
 }
 

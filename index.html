@@ -9,6 +9,7 @@
   <title>War Zones - Advanced Naval Combat</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
   <!-- Game Menu -->
@@ -17,7 +18,22 @@
       <h1>WAR ZONES</h1>
       <div class="menu-buttons">
         <button id="playVsAI" class="menu-button">Play vs AI</button>
-        <button id="playVsHuman" class="menu-button">Play vs Human</button>
+        <button id="playVsHuman" class="menu-button">Local 2 Player</button>
+        <button id="hostOnlineGame" class="menu-button">Host Online Game</button>
+        <button id="joinOnlineGame" class="menu-button">Join Online Game</button>
+      </div>
+      <div id="roomCodeSection" style="display: none; margin-top: 1.5rem;">
+        <div style="margin-bottom: 1rem;">
+          <label for="roomCodeInput" style="display: block; margin-bottom: 0.5rem; color: var(--primary-light);">Room Code:</label>
+          <input type="text" id="roomCodeInput" placeholder="Enter room code" style="padding: 0.5rem; width: 200px; font-size: 1rem; border-radius: 5px; border: 2px solid var(--primary-color); background: rgba(0,0,0,0.5); color: white; text-align: center; letter-spacing: 2px; text-transform: uppercase;">
+        </div>
+        <button id="confirmJoin" class="menu-button" style="margin-top: 0.5rem;">Connect</button>
+        <button id="cancelJoin" class="menu-button" style="margin-top: 0.5rem; background: #666;">Cancel</button>
+      </div>
+      <div id="roomCodeDisplay" style="display: none; margin-top: 1.5rem;">
+        <p style="color: var(--primary-light); margin-bottom: 0.5rem;">Share this code with your friend:</p>
+        <div style="font-size: 2rem; font-weight: bold; color: var(--accent-color); letter-spacing: 5px; padding: 1rem; background: rgba(0,0,0,0.5); border-radius: 5px; margin-bottom: 1rem;" id="roomCode"></div>
+        <p style="color: #aaa; font-size: 0.9rem;">Waiting for opponent to join...</p>
       </div>
     </div>
   </div>
