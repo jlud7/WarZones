@@ -997,8 +997,19 @@ startNewGame(mode) {
       this.gameState.gameMode = 'human';
       this.gameState.currentPlayer = 1;
       console.log('🆕 [START GAME] Human mode - gameMode set to:', this.gameState.gameMode, 'currentPlayer:', this.gameState.currentPlayer);
-      document.querySelector('.player-boards').style.display = 'block';
-      document.querySelector('.opponent-boards').style.display = 'block';
+
+      const playerBoards = document.querySelector('.player-boards');
+      const opponentBoards = document.querySelector('.opponent-boards');
+
+      playerBoards.style.display = 'block';
+      opponentBoards.style.display = 'block';
+
+      // Player 1 starts - ensure player boards are clickable
+      playerBoards.style.pointerEvents = 'auto';
+      opponentBoards.style.pointerEvents = 'none'; // Player 1 shouldn't click opponent boards during setup
+
+      console.log('🆕 [START GAME] Player boards pointerEvents:', playerBoards.style.pointerEvents, 'Opponent boards pointerEvents:', opponentBoards.style.pointerEvents);
+
       document.getElementById('undoMove').style.display = 'inline-block';
       // Update title for player 2's board
       document.getElementById('opponentTitle').textContent = "Player 2";
@@ -1091,19 +1102,30 @@ startNewGame(mode) {
               this.gameState.currentPlayer = 2;
 
               console.log('🔄 [PLACEMENT] After switch - phase:', this.gameState.phase, 'currentPlayer:', this.gameState.currentPlayer, 'currentShipIndex:', this.gameState.currentShipIndex);
-              
+
               // Update UI for player 2
-              document.querySelector('.player-boards').classList.remove('active');
-              document.querySelector('.opponent-boards').classList.add('active');
+              const playerBoards = document.querySelector('.player-boards');
+              const opponentBoards = document.querySelector('.opponent-boards');
+
+              playerBoards.classList.remove('active');
+              opponentBoards.classList.add('active');
+
+              // Ensure opponent boards are visible and clickable for Player 2
+              opponentBoards.style.display = 'block';
+              opponentBoards.style.pointerEvents = 'auto';
+              playerBoards.style.pointerEvents = 'none'; // Prevent accidental clicks on Player 1's board
+
+              console.log('🔄 [PLACEMENT] Opponent boards display:', opponentBoards.style.display, 'pointerEvents:', opponentBoards.style.pointerEvents);
+
               document.querySelectorAll('.player-score')[0].classList.remove('active');
               document.querySelectorAll('.player-score')[1].classList.add('active');
-              
+
               // Update commentary for player two's setup
               this.ui.updateCommentary(`Player Two: Place your ${this.gameState.getCurrentShip()} on your board.`);
               this.ui.updateGameInfo(`Player Two: Place your ships on your board.`);
               this.ui.highlightPlacementBoard();
               this.animateCommentaryBox();
-              
+
               document.getElementById('undoMove').style.display = 'inline-block';
             } else {
               console.log('🎮 [PLACEMENT] Player 2 finished - starting combat phase');
@@ -1112,10 +1134,20 @@ startNewGame(mode) {
               this.ui.hideShips('player');
               this.ui.hideShips('opponent');
               this.startCombatPhase();
-              
+
               // Update UI for combat
-              document.querySelector('.player-boards').classList.add('active');
-              document.querySelector('.opponent-boards').classList.remove('active');
+              const playerBoardsCombat = document.querySelector('.player-boards');
+              const opponentBoardsCombat = document.querySelector('.opponent-boards');
+
+              playerBoardsCombat.classList.add('active');
+              opponentBoardsCombat.classList.remove('active');
+
+              // Enable clicking on both boards during combat
+              playerBoardsCombat.style.pointerEvents = 'auto';
+              opponentBoardsCombat.style.pointerEvents = 'auto';
+
+              console.log('⚔️ [COMBAT] Both boards clickable - playerBoards pointerEvents:', playerBoardsCombat.style.pointerEvents, 'opponentBoards pointerEvents:', opponentBoardsCombat.style.pointerEvents);
+
               document.querySelectorAll('.player-score')[0].classList.add('active');
               document.querySelectorAll('.player-score')[1].classList.remove('active');
               
