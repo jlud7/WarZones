@@ -931,16 +931,20 @@ aiUseCannonBall() {
 
   setupEventListeners() {
     document.getElementById('playVsAI').addEventListener('click', () => {
+      console.log('🎮 [GAME MODE] Play vs AI button clicked');
       this.sound.initialize();
       this.gameState.gameMode = 'ai';
+      console.log('🎮 [GAME MODE] Game mode set to:', this.gameState.gameMode);
       document.getElementById('player2Name').textContent = "AI";
       document.getElementById('player2Icon').textContent = "🤖";
       this.startNewGame('ai');
     });
-    
+
     document.getElementById('playVsHuman').addEventListener('click', () => {
+      console.log('🎮 [GAME MODE] Play vs Human button clicked');
       this.sound.initialize();
       this.gameState.gameMode = 'human';
+      console.log('🎮 [GAME MODE] Game mode set to:', this.gameState.gameMode);
       document.getElementById('player2Name').textContent = "Player 2";
       document.getElementById('player2Icon').textContent = "👤";
       this.startNewGame('human');
@@ -955,26 +959,32 @@ aiUseCannonBall() {
 
 // Fix 3: Modify startNewGame to clear all AI timeouts
 startNewGame(mode) {
+    console.log('🆕 [START GAME] Starting new game with mode:', mode);
+    console.log('🆕 [START GAME] Current gameState.gameMode before reset:', this.gameState.gameMode);
+
     // Clear all AI turn timeouts
     this.aiTurnTimeouts.forEach(timeout => clearTimeout(timeout));
     this.aiTurnTimeouts = [];
-    
+
     // Reset turn processing flag
     this.isProcessingTurn = false;
-    
+
     this.ui.hideMainMenu();
     this.gameState.reset();
     this.ai.reset(); // Reset AI's targeting state
-    
+
+    console.log('🆕 [START GAME] After reset, gameState.gameMode:', this.gameState.gameMode);
+
     // Reset UI state
     document.querySelector('.player-boards').classList.add('active');
     document.querySelector('.opponent-boards').classList.remove('active');
     document.querySelectorAll('.player-score')[0].classList.add('active');
     document.querySelectorAll('.player-score')[1].classList.remove('active');
-    
+
     if (mode === 'human') {
       this.gameState.gameMode = 'human';
       this.gameState.currentPlayer = 1;
+      console.log('🆕 [START GAME] Human mode - gameMode set to:', this.gameState.gameMode, 'currentPlayer:', this.gameState.currentPlayer);
       document.querySelector('.player-boards').style.display = 'block';
       document.querySelector('.opponent-boards').style.display = 'block';
       document.getElementById('undoMove').style.display = 'inline-block';
@@ -1192,15 +1202,28 @@ handleAttack(e) {
         console.log("Pending powerup detected, skipping normal attack");
         return;
     }
-    
+
+    console.log('🎯 [ATTACK] Cell clicked - boardId:', boardId, 'gameMode:', this.gameState.gameMode, 'currentPlayer:', this.gameState.currentPlayer);
+
     // Validate correct player is attacking the correct board
     if (this.gameState.gameMode === 'human') {
       // For PvP, player 1 attacks opponent board, player 2 attacks player board
-      if (this.gameState.currentPlayer === 1 && !boardId.includes('opponent')) return;
-      if (this.gameState.currentPlayer === 2 && !boardId.includes('player')) return;
+      if (this.gameState.currentPlayer === 1 && !boardId.includes('opponent')) {
+        console.log('❌ [ATTACK] Player 1 tried to attack their own board - blocking');
+        return;
+      }
+      if (this.gameState.currentPlayer === 2 && !boardId.includes('player')) {
+        console.log('❌ [ATTACK] Player 2 tried to attack opponent board (should attack player board) - blocking');
+        return;
+      }
+      console.log('✅ [ATTACK] Attack validation passed for human mode');
     } else {
       // For AI game, player only attacks opponent board
-      if (!boardId.includes('opponent')) return;
+      if (!boardId.includes('opponent')) {
+        console.log('❌ [ATTACK] In AI mode, player tried to attack their own board - blocking');
+        return;
+      }
+      console.log('✅ [ATTACK] Attack validation passed for AI mode');
     }
     
     const index = parseInt(cell.dataset.index);
@@ -1320,42 +1343,51 @@ handleAttack(e) {
     }
     
     // Handle turn switching
+    console.log('🔄 [TURN] Processing turn switch - gameMode:', this.gameState.gameMode, 'result.hit:', result.hit);
     if (this.gameState.gameMode === 'ai') {
       if (!result.hit) {
         // If player misses, AI gets a turn
+        console.log('🤖 [AI TURN] Player missed, triggering AI turn');
         this.handleAITurn();
         // Note: isProcessingTurn will be reset at the end of AI's turn
       } else {
         // If player hits, they get another turn - reset processing flag
+        console.log('✅ [TURN] Player hit, continuing player turn');
         this.isProcessingTurn = false;
         this.ui.updateGameInfo(`Hit! Attack again!`);
       }
     } else if (this.gameState.gameMode === 'human') {
       if (!result.hit) {
         // Switch players on miss
+        const previousPlayer = this.gameState.currentPlayer;
         this.gameState.currentPlayer = this.gameState.currentPlayer === 1 ? 2 : 1;
-        
+        console.log('🔄 [TURN] Player missed - switching from Player', previousPlayer, 'to Player', this.gameState.currentPlayer);
+
         // Update UI to show current player
         this.updateUIForPlayerTurn();
-        
+
         this.ui.updateGameInfo(`Miss! It's Player ${this.gameState.currentPlayer}'s turn.`);
       } else {
         // Continue turn on hit in PvP mode
+        console.log('✅ [TURN] Player', this.gameState.currentPlayer, 'hit, continuing their turn');
         this.ui.updateGameInfo(`Hit! Player ${this.gameState.currentPlayer}, attack again!`);
       }
-      
+
       // Reset the processing flag for human vs human mode
       this.isProcessingTurn = false;
     }
   }
   
   updateUIForPlayerTurn() {
+    console.log('🖥️ [UI UPDATE] Updating UI for Player', this.gameState.currentPlayer);
     if (this.gameState.currentPlayer === 1) {
+      console.log('🖥️ [UI UPDATE] Showing Player 1 boards (player-boards visible, opponent-boards hidden)');
       document.querySelector('.player-boards').classList.add('active');
       document.querySelector('.opponent-boards').classList.remove('active');
       document.querySelectorAll('.player-score')[0].classList.add('active');
       document.querySelectorAll('.player-score')[1].classList.remove('active');
     } else {
+      console.log('🖥️ [UI UPDATE] Showing Player 2 boards (opponent-boards visible, player-boards hidden)');
       document.querySelector('.player-boards').classList.remove('active');
       document.querySelector('.opponent-boards').classList.add('active');
       document.querySelectorAll('.player-score')[0].classList.remove('active');
@@ -1364,28 +1396,41 @@ handleAttack(e) {
   }
   
 handleAITurn() {
+    console.log('🤖 [AI TURN] handleAITurn called - gameMode:', this.gameState.gameMode, 'phase:', this.gameState.phase);
+
+    // ⚠️ CRITICAL: Check if we should even be in AI mode
+    if (this.gameState.gameMode !== 'ai') {
+      console.error('🚨 [AI TURN ERROR] handleAITurn called but gameMode is:', this.gameState.gameMode, '- THIS SHOULD NOT HAPPEN IN HUMAN MODE!');
+      this.isProcessingTurn = false;
+      return;
+    }
+
     // Clear any existing AI timeouts first to prevent multiple AI turns
     this.aiTurnTimeouts.forEach(timeout => clearTimeout(timeout));
     this.aiTurnTimeouts = [];
-    
+
     // Ensure isProcessingTurn is true during AI's turn
     this.isProcessingTurn = true;
-    
+
     const timeout = setTimeout(() => {
       // Exit early if game is already over
       if (this.gameState.phase === 'gameOver') {
+        console.log('🤖 [AI TURN] Game is over, exiting AI turn');
         this.isProcessingTurn = false;
         return;
       }
-      
+
+      console.log('🤖 [AI TURN] Calculating AI move...');
       // Get AI move with improved targeting logic
       const aiMove = this.ai.calculateMove(this.gameState.boards.player);
-      
+
       if (!aiMove) {
-        console.log("AI could not determine a valid move.");
+        console.log("🤖 [AI TURN] AI could not determine a valid move.");
         this.isProcessingTurn = false;
         return;
       }
+
+      console.log('🤖 [AI TURN] AI selected move:', aiMove);
       
       const layer = aiMove.layer;
       const boardId = `player${layer}Board`;
@@ -1472,14 +1517,16 @@ handleAITurn() {
       
       // AI gets another turn if it hits, otherwise reset the processing flag
       if (aiResult.hit) {
+        console.log('🤖 [AI TURN] AI hit, taking another turn (recursive call)');
         this.handleAITurn();
         // Note: isProcessingTurn remains true and will be reset after the recursive AI turn
       } else {
         // AI's turn is over, reset the processing flag
+        console.log('🤖 [AI TURN] AI missed, ending AI turn and resetting to player');
         this.isProcessingTurn = false;
       }
     }, 1000);
-    
+
     // Store the timeout ID so we can clear it if needed
     this.aiTurnTimeouts.push(timeout);
   }
@@ -1977,6 +2024,8 @@ placeTreasureChests() {
   
   processAttack(boardId, index, layer) {
     const isPlayerAttacking = !boardId.includes('player');
+    console.log('⚔️ [PROCESS ATTACK] boardId:', boardId, 'index:', index, 'layer:', layer, 'isPlayerAttacking:', isPlayerAttacking);
+
     const targetBoards = isPlayerAttacking ? this.boards.opponent : this.boards.player;
     const targetShips = isPlayerAttacking ? this.ships.opponent : this.ships.player;
     const shots = isPlayerAttacking ? this.shots.player : this.shots.opponent;
