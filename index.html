@@ -9,15 +9,40 @@
   <title>War Zones - Advanced Naval Combat</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
 </head>
 <body>
   <!-- Game Menu -->
   <div id="gameMenu" class="menu-overlay">
     <div class="menu-content">
       <h1>WAR ZONES</h1>
-      <div class="menu-buttons">
+      
+      <div class="menu-buttons" id="mainMenuButtons">
         <button id="playVsAI" class="menu-button">Play vs AI</button>
-        <button id="playVsHuman" class="menu-button">Play vs Human</button>
+        <button id="playVsHuman" class="menu-button">Play vs Human (Local)</button>
+        <button id="playOnline" class="menu-button">Play Online</button>
+      </div>
+
+      <!-- Online Menu (Hidden by default) -->
+      <div class="menu-buttons hidden" id="onlineMenuButtons">
+        <button id="hostGame" class="menu-button">Host Game</button>
+        <button id="joinGame" class="menu-button">Join Game</button>
+        <button id="backToMain" class="menu-button">Back</button>
+      </div>
+
+      <!-- Join Game Input (Hidden) -->
+      <div class="menu-buttons hidden" id="joinGameInput">
+        <input type="text" id="roomCodeInput" placeholder="Enter Room Code" class="menu-input" maxlength="6">
+        <button id="connectBtn" class="menu-button">Connect</button>
+        <button id="backToOnline" class="menu-button">Back</button>
+      </div>
+
+      <!-- Host Game Display (Hidden) -->
+      <div class="menu-buttons hidden" id="hostGameDisplay">
+        <p>Your Room Code:</p>
+        <h2 id="roomCodeDisplay">...</h2>
+        <p>Waiting for opponent...</p>
+        <button id="cancelHost" class="menu-button">Cancel</button>
       </div>
     </div>
   </div>

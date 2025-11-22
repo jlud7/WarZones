@@ -123,6 +123,42 @@ body {
   transform: scale(0.98);
 }
 
+.hidden {
+  display: none !important;
+}
+
+.menu-input {
+  padding: 10px;
+  font-size: 1.1em;
+  width: 220px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--primary-color);
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  text-align: center;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.menu-input:focus {
+  outline: none;
+  box-shadow: 0 0 10px var(--primary-light);
+}
+
+#hostGameDisplay h2 {
+  font-size: 2rem;
+  color: var(--accent-color);
+  margin: 10px 0;
+  letter-spacing: 2px;
+  user-select: all;
+  cursor: pointer;
+}
+
+#hostGameDisplay p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
 /* Game Header */
 .game-header {
   width: 100%;

@@ -53,6 +53,7 @@ class WarZones {
     this.ai = new GameAI(this); // Pass 'this' to GameAI constructor
     this.stats = new Statistics();
     this.tutorial = new Tutorial();
+    this.network = new NetworkManager(this);
     this.playerWins = 0;
     this.aiWins = 0;
     this.aiTurnTimeouts = []; // Track AI turn timeouts
@@ -945,6 +946,62 @@ aiUseCannonBall() {
       document.getElementById('player2Icon').textContent = "👤";
       this.startNewGame('human');
     });
+
+    // Online Play Listeners
+    document.getElementById('playOnline').addEventListener('click', () => {
+      document.getElementById('mainMenuButtons').classList.add('hidden');
+      document.getElementById('onlineMenuButtons').classList.remove('hidden');
+    });
+
+    document.getElementById('hostGame').addEventListener('click', () => {
+      this.sound.initialize();
+      this.network.isHost = true;
+      this.network.initialize();
+      document.getElementById('onlineMenuButtons').classList.add('hidden');
+      document.getElementById('hostGameDisplay').classList.remove('hidden');
+    });
+
+    document.getElementById('joinGame').addEventListener('click', () => {
+      this.sound.initialize();
+      this.network.isHost = false;
+      document.getElementById('onlineMenuButtons').classList.add('hidden');
+      document.getElementById('joinGameInput').classList.remove('hidden');
+    });
+
+    document.getElementById('connectBtn').addEventListener('click', () => {
+      const code = document.getElementById('roomCodeInput').value.trim();
+      if (code) {
+        this.network.connect(code);
+      } else {
+        alert("Please enter a room code");
+      }
+    });
+
+    document.getElementById('backToMain').addEventListener('click', () => {
+      document.getElementById('onlineMenuButtons').classList.add('hidden');
+      document.getElementById('mainMenuButtons').classList.remove('hidden');
+    });
+
+    document.getElementById('backToOnline').addEventListener('click', () => {
+      document.getElementById('joinGameInput').classList.add('hidden');
+      document.getElementById('onlineMenuButtons').classList.remove('hidden');
+    });
+
+    document.getElementById('cancelHost').addEventListener('click', () => {
+      this.network.reset();
+      document.getElementById('hostGameDisplay').classList.add('hidden');
+      document.getElementById('onlineMenuButtons').classList.remove('hidden');
+    });
+
+    // Allow clicking the room code to copy it
+    document.getElementById('roomCodeDisplay').addEventListener('click', (e) => {
+      const code = e.target.textContent;
+      if (code && code !== '...') {
+        navigator.clipboard.writeText(code).then(() => {
+          this.ui.updateCommentary("Room code copied to clipboard!");
+        });
+      }
+    });
     
     document.getElementById('orientationButton').addEventListener('click', () => this.rotateShip());
     document.getElementById('toggleSound').addEventListener('click', () => this.sound.toggleSound());
@@ -981,6 +1038,18 @@ startNewGame(mode) {
       // Update title for player 2's board
       document.getElementById('opponentTitle').textContent = "Player 2";
       this.uiUpdateForHumanPlacement();
+    } else if (mode === 'online') {
+      this.gameState.gameMode = 'online';
+      this.gameState.currentPlayer = 1; // Local player is always 1 during setup
+      document.querySelector('.player-boards').style.display = 'block';
+      document.querySelector('.opponent-boards').style.display = 'block';
+      document.getElementById('undoMove').style.display = 'inline-block';
+      document.getElementById('opponentTitle').textContent = "Opponent";
+      document.getElementById('player2Name').textContent = "Opponent";
+      document.getElementById('player2Icon').textContent = "👤";
+      
+      // In online mode, we just set up our own ships first
+      this.uiUpdateForOnlinePlacement();
     } else {
       this.gameState.gameMode = 'ai';
       document.querySelector('.player-boards').style.display = 'block';
@@ -1015,6 +1084,122 @@ startNewGame(mode) {
     }, 1000);
   }
 
+  uiUpdateForOnlinePlacement() {
+    this.ui.hideShips('opponent');
+    this.ui.showShips('player');
+  }
+
+  onPeerConnected(isHost) {
+    this.ui.hideMainMenu();
+    this.startNewGame('online');
+    this.gameState.myPlayerId = isHost ? 1 : 2;
+    this.gameState.currentTurn = 1; // Host always starts
+    this.ui.updateCommentary(isHost ? "Opponent connected! Place your ships." : "Connected to host! Place your ships.");
+  }
+
+  handlePeerData(data) {
+    console.log('Processing peer data:', data);
+    switch(data.type) {
+      case 'SHIPS_READY':
+        this.gameState.opponentReady = true;
+        this.loadOpponentShips(data.ships);
+        
+        if (this.gameState.isPlacementComplete()) {
+           this.startOnlineCombat();
+        } else {
+           this.ui.updateCommentary("Opponent is ready. Finish placing your ships!");
+        }
+        break;
+      case 'ATTACK':
+        this.handleIncomingAttack(data);
+        break;
+      case 'ATTACK_RESULT':
+        this.handleAttackResult(data);
+        break;
+    }
+  }
+
+  loadOpponentShips(shipsData) {
+      this.gameState.ships.opponent = shipsData;
+      // Reconstruct board grid from ships for opponent (so we can check hits later if needed, though we rely on them mostly)
+      // Actually, we should probably trust the result they send back, but keeping state synced is good.
+      // However, we CANNOT put the ships on the board visibly.
+      
+      this.gameState.boards.opponent = this.gameState.createEmptyBoards();
+      
+      Object.entries(shipsData).forEach(([shipName, ship]) => {
+         const layer = GAME_CONSTANTS.SHIPS[shipName].layer;
+         ship.positions.forEach(pos => {
+             this.gameState.boards.opponent[layer][pos] = shipName;
+         });
+      });
+  }
+
+  startOnlineCombat() {
+      this.gameState.phase = 'combat';
+      this.ui.updateGameInfo('Combat phase - Game Started!');
+      
+      const isMyTurn = this.gameState.currentTurn === this.gameState.myPlayerId;
+      this.ui.updateCommentary(isMyTurn ? "Your Turn! Attack!" : "Opponent's Turn - Wait...");
+      
+      // Clear placement highlights
+      document.querySelectorAll('.board-section.placement-active').forEach(section => {
+        section.classList.remove('placement-active');
+      });
+  }
+
+  handleIncomingAttack(data) {
+    // Opponent attacked me
+    const { index, layer } = data;
+    const boardId = `player${layer}Board`;
+    
+    // Process attack on my board
+    const result = this.gameState.processAttack(boardId, index, layer);
+    
+    // Update my UI
+    this.ui.updateBoard(result);
+    this.sound.playSound(result.hit ? 'hit' : 'miss');
+    if (result.sunk) this.sound.playSound('sunk');
+    
+    // Send result back
+    this.network.send({
+      type: 'ATTACK_RESULT',
+      result: result,
+      turnChange: true // Switch turn
+    });
+    
+    // Check game over
+    if (result.gameOver.isOver) {
+       // I lost
+       this.handleGameOver(result.gameOver);
+    } else {
+       // Switch turn
+       this.gameState.currentTurn = this.gameState.myPlayerId; // Now it's my turn
+       this.ui.updateCommentary("Your Turn! Attack!");
+    }
+  }
+
+  handleAttackResult(data) {
+    // I attacked, here is the result
+    const result = data.result;
+    
+    // Use updateBoard but map boardId to opponent
+    result.boardId = result.boardId.replace('player', 'opponent'); // Transform ID
+    
+    this.ui.updateBoard(result);
+    this.sound.playSound(result.hit ? 'hit' : 'miss');
+    if (result.sunk) this.sound.playSound('sunk');
+    
+    if (result.gameOver.isOver) {
+       // I won
+       this.handleGameOver(result.gameOver);
+    } else {
+       // Switch turn
+       this.gameState.currentTurn = this.gameState.myPlayerId === 1 ? 2 : 1; // Opponent turn
+       this.ui.updateCommentary("Opponent's Turn - Wait...");
+    }
+  }
+
   handleShipPlacement(boardId, index, layer) {
     if (this.gameState.phase !== 'setup') return;
     const result = this.gameState.placeShip(boardId, index, layer);
@@ -1046,6 +1231,20 @@ startNewGame(mode) {
       if (this.gameState.isPlacementComplete()) {
         // Hide undo button
         document.getElementById('undoMove').style.display = 'none';
+        
+        if (this.gameState.gameMode === 'online') {
+           this.ui.updateCommentary("Waiting for opponent...");
+           // Send ships to opponent
+           this.network.send({
+             type: 'SHIPS_READY',
+             ships: this.gameState.ships.player
+           });
+           
+           if (this.gameState.opponentReady) {
+              this.startOnlineCombat();
+           }
+           return;
+        }
         
         setTimeout(() => {
           if (this.gameState.gameMode === 'human') {
@@ -1180,9 +1379,31 @@ startCombatPhase() {
     }
   }
 
-handleAttack(e) {
+  handleAttack(e) {
     // Early exit if not in combat phase or already processing a turn
     if (this.gameState.phase !== 'combat' || this.isProcessingTurn) return;
+
+    // Online mode logic
+    if (this.gameState.gameMode === 'online') {
+        if (this.gameState.currentTurn !== this.gameState.myPlayerId) {
+            this.ui.updateCommentary("It's not your turn!");
+            return;
+        }
+        // Only allow clicking opponent board
+        if (!e.target.closest('.opponent-boards')) return;
+        
+        const index = parseInt(e.target.dataset.index);
+        const layer = e.target.closest('.board').dataset.layer;
+        
+        if (e.target.classList.contains('hit') || e.target.classList.contains('miss')) return;
+
+        this.network.send({
+           type: 'ATTACK',
+           index: index,
+           layer: layer
+        });
+        return;
+    }
     
     const cell = e.target;
     const boardId = cell.closest('.board').id;
@@ -1781,6 +2002,9 @@ placeTreasureChests() {
   // Clear any existing treasure chests
   this.treasureChests.player = [];
   this.treasureChests.opponent = [];
+  
+  // Disable treasure chests in online mode for now to avoid desync
+  if (this.gameMode === 'online') return;
   
   const subLayer = 'Sub';
   const boardSize = GAME_CONSTANTS.BOARD_SIZE;
@@ -3360,6 +3584,12 @@ showSonarEffect(side, layer, centerIndex) {
   }, 3000);
 }
   
+  showRoomCode(code) {
+    document.getElementById('roomCodeDisplay').textContent = code;
+    document.getElementById('roomCodeDisplay').title = "Click to copy";
+    this.updateCommentary("Waiting for opponent... Share this code!");
+  }
+
   renderMainMenu() {
     document.getElementById('gameMenu').style.display = 'flex';
   }
@@ -3657,6 +3887,103 @@ class Tutorial {
       overlay.remove();
       this.showStep();
     });
+  }
+}
+
+/* --- Network Manager --- */
+class NetworkManager {
+  constructor(game) {
+    this.game = game;
+    this.peer = null;
+    this.conn = null;
+    this.isHost = false;
+    this.roomCode = null;
+    this.isConnected = false;
+  }
+
+  initialize() {
+    this.peer = new Peer(null, {
+      debug: 2
+    });
+
+    this.peer.on('open', (id) => {
+      this.roomCode = id;
+      console.log('My peer ID is: ' + id);
+      if (this.isHost) {
+        this.game.ui.showRoomCode(id);
+      }
+    });
+
+    this.peer.on('connection', (conn) => {
+      this.handleConnection(conn);
+    });
+
+    this.peer.on('error', (err) => {
+      console.error('PeerJS error:', err);
+      alert('Connection error: ' + err.type);
+      this.game.ui.showMainMenu();
+    });
+  }
+
+  connect(remoteId) {
+    if (!this.peer) this.initialize();
+    
+    // Close existing connection if any
+    if (this.conn) {
+      this.conn.close();
+    }
+
+    console.log('Connecting to ' + remoteId);
+    const conn = this.peer.connect(remoteId);
+    this.handleConnection(conn);
+  }
+
+  handleConnection(conn) {
+    this.conn = conn;
+    
+    this.conn.on('open', () => {
+      console.log('Connected to: ' + conn.peer);
+      this.isConnected = true;
+      this.game.onPeerConnected(this.isHost);
+    });
+
+    this.conn.on('data', (data) => {
+      console.log('Received data:', data);
+      this.game.handlePeerData(data);
+    });
+
+    this.conn.on('close', () => {
+      console.log('Connection closed');
+      this.isConnected = false;
+      alert('Connection lost!');
+      this.game.ui.showMainMenu();
+    });
+    
+    this.conn.on('error', (err) => {
+      console.error('Connection error:', err);
+    });
+  }
+
+  send(data) {
+    if (this.conn && this.conn.open) {
+      this.conn.send(data);
+    } else {
+      console.error('Connection not open, cannot send data');
+    }
+  }
+  
+  reset() {
+    if (this.conn) {
+      this.conn.close();
+    }
+    if (this.peer) {
+      this.peer.destroy();
+    }
+    this.peer = null;
+    this.conn = null;
+    this.isHost = false;
+    this.roomCode = null;
+    this.isConnected = false;
   }
 }
 
