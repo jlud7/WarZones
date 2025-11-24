@@ -2072,6 +2072,11 @@ placeTreasureChests() {
     this.activePowerup = null;
     this.pendingPowerup = null;
     this.aiPendingPowerup = null;
+    
+    // Online multiplayer state
+    this.opponentReady = false;
+    this.myPlayerId = null;
+    this.currentTurn = null;
   }
   
   createEmptyBoards() {
@@ -3941,11 +3946,22 @@ class NetworkManager {
   handleConnection(conn) {
     this.conn = conn;
     
-    this.conn.on('open', () => {
+    const handleOpen = () => {
+      // Prevent double-calling if already connected
+      if (this.isConnected) return;
+      
       console.log('Connected to: ' + conn.peer);
       this.isConnected = true;
       this.game.onPeerConnected(this.isHost);
-    });
+    };
+    
+    // Set up the 'open' event handler
+    this.conn.on('open', handleOpen);
+    
+    // Check if the connection is already open (event may have already fired)
+    if (this.conn.open) {
+      handleOpen();
+    }
 
     this.conn.on('data', (data) => {
       console.log('Received data:', data);
