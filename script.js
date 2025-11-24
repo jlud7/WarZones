@@ -956,7 +956,8 @@ aiUseCannonBall() {
     document.getElementById('hostGame').addEventListener('click', () => {
       this.sound.initialize();
       this.network.isHost = true;
-      this.network.initialize();
+      const roomCode = this.network.generateRoomCode();
+      this.network.initialize(roomCode);
       document.getElementById('onlineMenuButtons').classList.add('hidden');
       document.getElementById('hostGameDisplay').classList.remove('hidden');
     });
@@ -969,7 +970,7 @@ aiUseCannonBall() {
     });
 
     document.getElementById('connectBtn').addEventListener('click', () => {
-      const code = document.getElementById('roomCodeInput').value.trim();
+      const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
       if (code) {
         this.network.connect(code);
       } else {
@@ -3906,8 +3907,20 @@ class NetworkManager {
     this.isConnected = false;
   }
 
-  initialize() {
-    this.peer = new Peer(null, {
+  generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars like 0/O, 1/I/L
+    let code = '';
+    for (let i = 0; i < 7; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  initialize(customId = null) {
+    // Use custom ID if provided (for hosting), otherwise let PeerJS generate one
+    const peerId = customId || null;
+    
+    this.peer = new Peer(peerId, {
       debug: 2
     });
 
