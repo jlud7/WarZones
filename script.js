@@ -1353,6 +1353,11 @@ startNewGame(mode) {
     // I attacked, here is the result
     const result = data.result;
     
+    // Track my hit locally
+    if (result.hit) {
+      this.gameState.shots.player.hits++;
+    }
+    
     // Use updateBoard but map boardId to opponent
     result.boardId = result.boardId.replace('player', 'opponent'); // Transform ID
     
@@ -1586,6 +1591,9 @@ startCombatPhase() {
         
         if (e.target.classList.contains('hit') || e.target.classList.contains('miss')) return;
 
+        // Track my shot locally
+        this.gameState.shots.player.total++;
+        
         this.network.send({
            type: 'ATTACK',
            index: index,
