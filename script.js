@@ -1009,6 +1009,161 @@ aiUseCannonBall() {
     document.getElementById('resetGame').addEventListener('click', () => this.startNewGame('ai'));
     document.getElementById('newGameHuman').addEventListener('click', () => this.startNewGame('human'));
     document.getElementById('undoMove').addEventListener('click', () => this.undoPlacement());
+    
+    // How to Play buttons
+    document.getElementById('howToPlay').addEventListener('click', () => this.showHowToPlay());
+    document.getElementById('helpButton').addEventListener('click', () => this.showHowToPlay());
+  }
+
+  showHowToPlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'how-to-play-overlay';
+    overlay.id = 'howToPlayOverlay';
+    
+    overlay.innerHTML = `
+      <div class="how-to-play-content">
+        <button class="close-button" id="closeHowToPlay">✕</button>
+        
+        <h1>🎯 WAR ZONES</h1>
+        <p class="subtitle">Multi-Dimensional Naval Combat</p>
+        
+        <div class="how-to-play-sections">
+          
+          <section class="htp-section">
+            <h2>🌍 The Battlefield</h2>
+            <p>War Zones is fought across <strong>four vertical layers</strong>, each representing a different domain of warfare:</p>
+            <div class="layers-grid">
+              <div class="layer-item">
+                <span class="layer-icon">🌌</span>
+                <span class="layer-name">SPACE</span>
+                <span class="layer-desc">Orbital domain</span>
+              </div>
+              <div class="layer-item">
+                <span class="layer-icon">☁️</span>
+                <span class="layer-name">SKY</span>
+                <span class="layer-desc">Aerial combat</span>
+              </div>
+              <div class="layer-item">
+                <span class="layer-icon">🌊</span>
+                <span class="layer-name">SEA</span>
+                <span class="layer-desc">Surface warfare</span>
+              </div>
+              <div class="layer-item">
+                <span class="layer-icon">🔵</span>
+                <span class="layer-name">SUB</span>
+                <span class="layer-desc">Underwater ops</span>
+              </div>
+            </div>
+          </section>
+          
+          <section class="htp-section">
+            <h2>🚢 Your Fleet</h2>
+            <p>Place these <strong>5 ships</strong> across the battlefield layers:</p>
+            <div class="ships-grid">
+              <div class="ship-item">
+                <span class="ship-icon">👽</span>
+                <div class="ship-info">
+                  <span class="ship-name">Spacecraft</span>
+                  <span class="ship-details">2×2 square • Space Layer</span>
+                </div>
+              </div>
+              <div class="ship-item">
+                <span class="ship-icon">✈️</span>
+                <div class="ship-info">
+                  <span class="ship-name">Fighter Jet</span>
+                  <span class="ship-details">1 cell • Sky Layer</span>
+                </div>
+              </div>
+              <div class="ship-item">
+                <span class="ship-icon">🚢</span>
+                <div class="ship-info">
+                  <span class="ship-name">Battleship</span>
+                  <span class="ship-details">3 cells in a line • Sea Layer</span>
+                </div>
+              </div>
+              <div class="ship-item">
+                <span class="ship-icon">🚢</span>
+                <div class="ship-info">
+                  <span class="ship-name">Cruiser</span>
+                  <span class="ship-details">2 cells in a line • Sea Layer</span>
+                </div>
+              </div>
+              <div class="ship-item">
+                <span class="ship-icon">⚓</span>
+                <div class="ship-info">
+                  <span class="ship-name">Submarine</span>
+                  <span class="ship-details">2 cells in a line • Sub Layer</span>
+                </div>
+              </div>
+            </div>
+            <p class="tip">💡 Press <kbd>R</kbd> to rotate ships during placement</p>
+          </section>
+          
+          <section class="htp-section">
+            <h2>⚔️ Combat Rules</h2>
+            <div class="rules-list">
+              <div class="rule-item">
+                <span class="rule-icon">🎯</span>
+                <span>Click on opponent's grid cells to attack</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-icon">🔥</span>
+                <span><strong>HIT?</strong> Attack again! Keep firing until you miss</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-icon">💨</span>
+                <span><strong>MISS?</strong> Turn passes to your opponent</span>
+              </div>
+              <div class="rule-item">
+                <span class="rule-icon">💀</span>
+                <span>Destroy all enemy ships to win!</span>
+              </div>
+            </div>
+          </section>
+          
+          <section class="htp-section treasure-section">
+            <h2>💎 Treasure Chests</h2>
+            <p>Hidden in the <strong>Sub layer</strong> is a treasure chest! Find your opponent's treasure to unlock a powerful ability:</p>
+            <div class="powerups-grid">
+              <div class="powerup-item">
+                <span class="powerup-icon">✈️</span>
+                <div class="powerup-info">
+                  <span class="powerup-name">BLACK BOX</span>
+                  <span class="powerup-desc">Deploy an extra fighter jet to your Sky layer</span>
+                </div>
+              </div>
+              <div class="powerup-item">
+                <span class="powerup-icon">🔫</span>
+                <div class="powerup-info">
+                  <span class="powerup-name">KRYPTON LASER</span>
+                  <span class="powerup-desc">Strike one position across ALL four layers simultaneously</span>
+                </div>
+              </div>
+              <div class="powerup-item">
+                <span class="powerup-icon">💣</span>
+                <div class="powerup-info">
+                  <span class="powerup-name">CANNON BALL</span>
+                  <span class="powerup-desc">Bombard a 2×2 area on the Sea layer</span>
+                </div>
+              </div>
+            </div>
+          </section>
+          
+        </div>
+        
+        <button class="got-it-button" id="gotItButton">Got it!</button>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Close button handlers
+    const closeOverlay = () => overlay.remove();
+    document.getElementById('closeHowToPlay').addEventListener('click', closeOverlay);
+    document.getElementById('gotItButton').addEventListener('click', closeOverlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeOverlay();
+    });
   }
 
 // Fix 3: Modify startNewGame to clear all AI timeouts

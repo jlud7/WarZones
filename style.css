@@ -1508,3 +1508,368 @@ body {
 .selected-powerup .powerup-desc {
   color: var(--text-color);
 }
+
+/* === How to Play Styles === */
+.menu-button.secondary {
+  background: transparent;
+  border: 2px solid var(--primary-color);
+  color: var(--primary-light);
+  margin-top: 1rem;
+}
+
+.menu-button.secondary:hover {
+  background: rgba(30, 136, 229, 0.2);
+  border-color: var(--primary-light);
+}
+
+.header-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.how-to-play-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.how-to-play-content {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  border: 1px solid rgba(100, 180, 255, 0.3);
+  box-shadow: 0 0 40px rgba(30, 136, 229, 0.3), inset 0 0 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.how-to-play-content h1 {
+  text-align: center;
+  font-size: 2rem;
+  background: linear-gradient(135deg, #64b5f6, #e91e63);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.25rem;
+}
+
+.how-to-play-content .subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: var(--text-color);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.how-to-play-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.htp-section {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.htp-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  color: var(--primary-light);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.htp-section p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.htp-section strong {
+  color: var(--text-color);
+}
+
+/* Layers Grid */
+.layers-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.layer-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.layer-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.layer-icon {
+  font-size: 1.5rem;
+}
+
+.layer-name {
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: var(--text-color);
+  letter-spacing: 1px;
+}
+
+.layer-desc {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Ships Grid */
+.ships-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ship-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.ship-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ship-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  text-align: center;
+}
+
+.ship-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ship-name {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+.ship-details {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.tip {
+  background: rgba(255, 214, 0, 0.1);
+  border: 1px solid rgba(255, 214, 0, 0.3);
+  border-radius: 6px;
+  padding: 0.6rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0 !important;
+  text-align: center;
+}
+
+.tip kbd {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Rules List */
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.rule-icon {
+  font-size: 1.25rem;
+  width: 30px;
+  text-align: center;
+}
+
+/* Powerups Grid */
+.treasure-section {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 140, 0, 0.05) 100%);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.treasure-section h2 {
+  color: gold;
+}
+
+.powerups-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.powerup-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  transition: all 0.2s;
+}
+
+.powerup-item:hover {
+  background: rgba(255, 215, 0, 0.1);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.powerup-item .powerup-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  text-align: center;
+}
+
+.powerup-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.powerup-info .powerup-name {
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: gold;
+  letter-spacing: 1px;
+}
+
+.powerup-info .powerup-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Got It Button */
+.got-it-button {
+  display: block;
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: bold;
+  color: white;
+  background: linear-gradient(135deg, var(--primary-color), #e91e63);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.got-it-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+}
+
+/* Mobile responsive for How to Play */
+@media (max-width: 600px) {
+  .how-to-play-content {
+    padding: 1.5rem 1rem;
+    max-height: 85vh;
+  }
+  
+  .how-to-play-content h1 {
+    font-size: 1.5rem;
+  }
+  
+  .layers-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .layer-icon {
+    font-size: 1.25rem;
+  }
+  
+  .ship-item, .powerup-item {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .ship-icon, .powerup-item .powerup-icon {
+    font-size: 1.25rem;
+    width: 32px;
+  }
+}
