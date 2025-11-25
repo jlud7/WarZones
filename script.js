@@ -1140,6 +1140,9 @@ startNewGame(mode) {
       this.gameState.phase = 'combat';
       this.ui.updateGameInfo('Combat phase - Game Started!');
       
+      // Place treasure chest on my board (opponent has their own)
+      this.gameState.placeTreasureChests();
+      
       const isMyTurn = this.gameState.currentTurn === this.gameState.myPlayerId;
       this.ui.updateCommentary(isMyTurn ? "Your Turn! Attack!" : "Opponent's Turn - Wait...");
       
@@ -1162,21 +1165,24 @@ startNewGame(mode) {
     this.sound.playSound(result.hit ? 'hit' : 'miss');
     if (result.sunk) this.sound.playSound('sunk');
     
-    // Send result back
+    // Send result back - only switch turn if they missed (like AI mode)
     this.network.send({
       type: 'ATTACK_RESULT',
       result: result,
-      turnChange: true // Switch turn
+      turnChange: !result.hit // Only switch turn on miss
     });
     
     // Check game over
     if (result.gameOver.isOver) {
        // I lost
        this.handleGameOver(result.gameOver);
-    } else {
-       // Switch turn
-       this.gameState.currentTurn = this.gameState.myPlayerId; // Now it's my turn
+    } else if (!result.hit) {
+       // Only switch turn to me if opponent missed
+       this.gameState.currentTurn = this.gameState.myPlayerId;
        this.ui.updateCommentary("Your Turn! Attack!");
+    } else {
+       // Opponent hit, they get another turn
+       this.ui.updateCommentary(result.treasure ? "Opponent found a treasure!" : "Opponent hit! They attack again...");
     }
   }
 
@@ -1194,10 +1200,21 @@ startNewGame(mode) {
     if (result.gameOver.isOver) {
        // I won
        this.handleGameOver(result.gameOver);
+    } else if (result.treasure) {
+       // I found a treasure chest! Show powerup menu
+       this.ui.updateCommentary("You found a treasure chest!");
+       this.animateCommentaryBox();
+       this.ui.showTreasureMenu();
+       // Turn stays with me after selecting powerup
+    } else if (result.hit) {
+       // I hit, I get another turn (like AI mode)
+       this.ui.updateCommentary(result.sunk ? `You sunk their ${result.shipType}! Attack again!` : "Hit! Attack again!");
+       this.animateCommentaryBox();
+       // currentTurn stays as myPlayerId
     } else {
-       // Switch turn
-       this.gameState.currentTurn = this.gameState.myPlayerId === 1 ? 2 : 1; // Opponent turn
-       this.ui.updateCommentary("Opponent's Turn - Wait...");
+       // I missed, switch turn to opponent
+       this.gameState.currentTurn = this.gameState.myPlayerId === 1 ? 2 : 1;
+       this.ui.updateCommentary("You missed! Opponent's Turn - Wait...");
     }
   }
 
@@ -2004,9 +2021,6 @@ placeTreasureChests() {
   this.treasureChests.player = [];
   this.treasureChests.opponent = [];
   
-  // Disable treasure chests in online mode for now to avoid desync
-  if (this.gameMode === 'online') return;
-  
   const subLayer = 'Sub';
   const boardSize = GAME_CONSTANTS.BOARD_SIZE;
   
@@ -2018,14 +2032,6 @@ placeTreasureChests() {
     }
   }
   
-  // Get all empty cells in opponent's sub board
-  const opponentEmptyCells = [];
-  for (let i = 0; i < boardSize * boardSize; i++) {
-    if (this.boards.opponent[subLayer][i] === null) {
-      opponentEmptyCells.push(i);
-    }
-  }
-  
   // Place exactly one treasure chest in player's board if there are empty cells
   if (playerEmptyCells.length > 0) {
     const randomIndex = Math.floor(Math.random() * playerEmptyCells.length);
@@ -2033,6 +2039,18 @@ placeTreasureChests() {
     this.boards.player[subLayer][treasurePosition] = 'Treasure';
     this.treasureChests.player.push(treasurePosition);
     console.log(`Treasure chest placed on PLAYER's Sub board at index: ${treasurePosition}`);
+  }
+  
+  // In online mode, don't place treasure on opponent's board - they place their own
+  // We'll discover it when we attack and they send back the result
+  if (this.gameMode === 'online') return;
+  
+  // Get all empty cells in opponent's sub board (for AI/local modes)
+  const opponentEmptyCells = [];
+  for (let i = 0; i < boardSize * boardSize; i++) {
+    if (this.boards.opponent[subLayer][i] === null) {
+      opponentEmptyCells.push(i);
+    }
   }
   
   // Place exactly one treasure chest in opponent's board if there are empty cells
