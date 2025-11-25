@@ -3948,9 +3948,11 @@ showGameOver(result) {
     winnerText = isVictory ? 'Victory!' : 'Defeat!';
   }
     
-  const shots = this.game.gameState.shots[result.winner].total;
-  const hits = this.game.gameState.shots[result.winner].hits;
-  const accuracy = Math.round((hits / shots) * 100);
+  // Get shots data for the winner
+  const shotsData = this.game.gameState.shots[result.winner];
+  const shots = shotsData ? shotsData.total : 0;
+  const hits = shotsData ? shotsData.hits : 0;
+  const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
   
   const overlay = document.createElement('div');
   overlay.className = 'game-over-overlay';
