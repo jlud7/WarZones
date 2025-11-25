@@ -1329,8 +1329,16 @@ startNewGame(mode) {
     
     // Check game over
     if (result.gameOver.isOver) {
-       // I lost
-       this.handleGameOver(result.gameOver);
+       // I lost - opponent destroyed all my ships
+       this.gameState.phase = 'gameOver';
+       this.isProcessingTurn = false;
+       // Adjust winner for online mode display
+       const gameOverResult = {
+         ...result.gameOver,
+         winner: 'opponent', // Opponent won
+         mode: 'online'
+       };
+       this.ui.showGameOver(gameOverResult);
     } else if (!result.hit) {
        // Only switch turn to me if opponent missed
        this.gameState.currentTurn = this.gameState.myPlayerId;
@@ -1353,8 +1361,16 @@ startNewGame(mode) {
     if (result.sunk) this.sound.playSound('sunk');
     
     if (result.gameOver.isOver) {
-       // I won
-       this.handleGameOver(result.gameOver);
+       // I won - I destroyed all opponent's ships
+       this.gameState.phase = 'gameOver';
+       this.isProcessingTurn = false;
+       // Adjust winner for online mode display
+       const gameOverResult = {
+         ...result.gameOver,
+         winner: 'player', // I won
+         mode: 'online'
+       };
+       this.ui.showGameOver(gameOverResult);
     } else if (result.treasure) {
        // I found a treasure chest! Show powerup menu
        this.ui.updateCommentary("You found a treasure chest!");
@@ -3923,9 +3939,14 @@ showSonarEffect(side, layer, centerIndex) {
   
 showGameOver(result) {
   const isVictory = result.winner === 'player';
-  const winnerText = isVictory ? 
-    (result.mode === 'human' ? `Player ${this.game.gameState.currentPlayer} Wins!` : 'Victory!') : 
-    'Defeat!';
+  let winnerText;
+  if (result.mode === 'human') {
+    winnerText = isVictory ? `Player ${this.game.gameState.currentPlayer} Wins!` : 'Defeat!';
+  } else if (result.mode === 'online') {
+    winnerText = isVictory ? 'Victory!' : 'Defeat!';
+  } else {
+    winnerText = isVictory ? 'Victory!' : 'Defeat!';
+  }
     
   const shots = this.game.gameState.shots[result.winner].total;
   const hits = this.game.gameState.shots[result.winner].hits;
