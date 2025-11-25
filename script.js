@@ -3956,11 +3956,15 @@ showGameOver(result) {
     winnerText = isVictory ? 'Victory!' : 'Defeat!';
   }
     
-  // Get shots data for the winner
-  const shotsData = this.game.gameState.shots[result.winner];
-  const shots = shotsData ? shotsData.total : 0;
-  const hits = shotsData ? shotsData.hits : 0;
+  // Get shots data - for online mode, always show the local player's stats
+  // For other modes, show the winner's stats
+  const statsKey = result.mode === 'online' ? 'player' : result.winner;
+  const shotsData = this.game.gameState.shots[statsKey] || { total: 0, hits: 0 };
+  const shots = typeof shotsData.total === 'number' ? shotsData.total : 0;
+  const hits = typeof shotsData.hits === 'number' ? shotsData.hits : 0;
   const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+  
+  console.log('Game Over Stats:', { statsKey, shotsData, shots, hits, accuracy });
   
   const overlay = document.createElement('div');
   overlay.className = 'game-over-overlay';
