@@ -957,9 +957,14 @@ aiUseCannonBall() {
       this.sound.initialize();
       this.network.isHost = true;
       const roomCode = this.network.generateRoomCode();
-      this.network.initialize(roomCode);
+
+      // Show the room code immediately, don't wait for PeerJS connection
+      this.ui.showRoomCode(roomCode);
       document.getElementById('onlineMenuButtons').classList.add('hidden');
       document.getElementById('hostGameDisplay').classList.remove('hidden');
+
+      // Initialize PeerJS with the room code
+      this.network.initialize(roomCode);
     });
 
     document.getElementById('joinGame').addEventListener('click', () => {
@@ -4125,19 +4130,24 @@ class NetworkManager {
   }
 
   initialize(customId = null) {
+    // Store the room code immediately (don't wait for PeerJS)
+    if (customId) {
+      this.roomCode = customId;
+    }
+
     // Use custom ID if provided (for hosting), otherwise let PeerJS generate one
     const peerId = customId || null;
-    
+
     this.peer = new Peer(peerId, {
       debug: 2
     });
 
     this.peer.on('open', (id) => {
-      this.roomCode = id;
-      console.log('My peer ID is: ' + id);
-      if (this.isHost) {
-        this.game.ui.showRoomCode(id);
+      // Update room code with PeerJS-confirmed ID (should match customId if provided)
+      if (!this.roomCode) {
+        this.roomCode = id;
       }
+      console.log('PeerJS connected with ID: ' + id);
     });
 
     this.peer.on('connection', (conn) => {
@@ -4146,7 +4156,47 @@ class NetworkManager {
 
     this.peer.on('error', (err) => {
       console.error('PeerJS error:', err);
-      alert('Connection error: ' + err.type);
+      // Provide more helpful error messages
+      let errorMessage = 'Connection error: ';
+      switch (err.type) {
+        case 'browser-incompatible':
+          errorMessage += 'Your browser does not support WebRTC.';
+          break;
+        case 'disconnected':
+          errorMessage += 'Connection to server lost. Please try again.';
+          break;
+        case 'network':
+          errorMessage += 'Network error. Check your internet connection.';
+          break;
+        case 'peer-unavailable':
+          errorMessage += 'Could not connect to that room code. Make sure it\'s correct.';
+          break;
+        case 'server-error':
+          errorMessage += 'Server error. Please try again later.';
+          break;
+        case 'socket-error':
+          errorMessage += 'Connection failed. Please try again.';
+          break;
+        case 'socket-closed':
+          errorMessage += 'Connection closed unexpectedly.';
+          break;
+        case 'unavailable-id':
+          errorMessage += 'That room code is already in use. Please try again.';
+          // Generate a new code and retry for hosts
+          if (this.isHost) {
+            const newCode = this.generateRoomCode();
+            this.game.ui.showRoomCode(newCode);
+            console.log('Retrying with new room code:', newCode);
+            this.peer.destroy();
+            this.peer = null;
+            this.initialize(newCode); // Recursively initialize with new code
+            return; // Don't show alert or return to menu
+          }
+          break;
+        default:
+          errorMessage += err.type || 'Unknown error';
+      }
+      alert(errorMessage);
       this.game.ui.showMainMenu();
     });
   }
