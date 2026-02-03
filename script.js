@@ -599,11 +599,11 @@ handleAIPowerupSelection() {
   // Determine which powerup the AI should choose based on game state
   const powerups = ['BlackBox', 'KryptonLaser', 'CannonBall'];
   let selectedPowerup;
-  
+
   // Count undiscovered ships in player's boards
   let undiscoveredShips = 0;
   let totalPositions = 0;
-  
+
   Object.keys(this.gameState.ships.player).forEach(shipType => {
     const ship = this.gameState.ships.player[shipType];
     if (!ship.isSunk && ship.positions.length > 0) {
@@ -611,12 +611,12 @@ handleAIPowerupSelection() {
       totalPositions += ship.positions.length - ship.hits.length;
     }
   });
-  
+
   // AI strategy:
   // If many undiscovered ships - prioritize CannonBall (intel gathering)
   // If few ships but many positions left - prioritize KryptonLaser (attack)
   // If fewer positions left - prioritize BlackBox (reinforcement)
-  
+
   if (Math.random() < 0.7) {
     // 70% chance to make a strategic choice
     if (undiscoveredShips >= 3) {
@@ -633,11 +633,11 @@ handleAIPowerupSelection() {
     // 30% chance to choose randomly
     selectedPowerup = powerups[Math.floor(Math.random() * powerups.length)];
   }
-  
+
   // Visual feedback about AI's choice
   const powerup = GAME_CONSTANTS.POWERUPS[selectedPowerup];
   this.ui.updateCommentary(`AI selected ${powerup.name}!`);
-  
+
   // Create a simple overlay to show AI's powerup selection
   const overlay = document.createElement('div');
   overlay.className = 'ai-powerup-overlay';
@@ -651,18 +651,24 @@ handleAIPowerupSelection() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(overlay);
-  
+
   // Remove overlay after a delay
   setTimeout(() => {
     overlay.classList.add('fade-out');
     setTimeout(() => overlay.remove(), 500);
   }, 2000);
-  
+
   // Activate the selected powerup for AI after the overlay is shown
   setTimeout(() => {
+    if (this.gameState.phase === 'gameOver') {
+      this.isProcessingTurn = false;
+      return;
+    }
     this.activatePowerupForAI(selectedPowerup);
+    // After powerup is used, allow player to take their turn
+    this.isProcessingTurn = false;
   }, 2500);
 }
   
@@ -716,19 +722,13 @@ activatePowerup(powerupType) {
       this.aiAddExtraJet();
       break;
     case 'KryptonLaser':
-      // AI will use laser attack on next turn
-      this.gameState.aiPendingPowerup = 'KryptonLaser';
-      this.ui.updateCommentary("AI will use Krypton Laser on its next attack!");
+      // AI uses Krypton Laser immediately - attacks same position across all layers
+      this.aiUseKryptonLaser();
       break;
-    case 'CannonBall':  // Changed from SonarPulse
+    case 'CannonBall':
       // AI uses cannon ball on sea layer
       this.aiUseCannonBall();
       break;
-  }
-  
-  // Continue game - AI's turn is over
-  if (this.gameState.gameMode === 'ai') {
-    // Player's turn
   }
 }
   
@@ -763,44 +763,153 @@ aiAddExtraJet() {
   }
 }
 
+aiUseKryptonLaser() {
+  // AI targets a position across all 4 layers
+  // Find the best position to attack - pick a layer with known hits or random
+  const boardSize = GAME_CONSTANTS.BOARD_SIZE;
+  let targetIndex = -1;
+
+  // Try to find a strategic position - look for unattacked positions
+  const allUnattacked = [];
+  for (let i = 0; i < boardSize * boardSize; i++) {
+    // Check if this position has unattacked cells in any layer
+    let hasUnattacked = false;
+    for (const layer of GAME_CONSTANTS.LAYERS) {
+      if (!this.ai.attackedPositions[layer].has(i)) {
+        hasUnattacked = true;
+        break;
+      }
+    }
+    if (hasUnattacked) {
+      allUnattacked.push(i);
+    }
+  }
+
+  if (allUnattacked.length > 0) {
+    targetIndex = allUnattacked[Math.floor(Math.random() * allUnattacked.length)];
+  } else {
+    targetIndex = Math.floor(Math.random() * boardSize * boardSize);
+  }
+
+  // Attack the same position across all layers
+  let hitCount = 0;
+  let sunkCount = 0;
+  const results = [];
+
+  GAME_CONSTANTS.LAYERS.forEach(layer => {
+    const boardId = `player${layer}Board`;
+
+    // Skip if already attacked
+    if (this.ai.attackedPositions[layer].has(targetIndex)) {
+      return;
+    }
+
+    const result = this.gameState.processAttack(boardId, targetIndex, layer);
+    results.push(result);
+
+    // Update AI's knowledge
+    if (result.hit) {
+      this.ai.recordHit(layer, targetIndex);
+      hitCount++;
+      if (result.sunk) {
+        sunkCount++;
+        this.sound.playSound('sunk');
+        this.animations.playSunkAnimation(
+          this.gameState.ships.player[result.shipType].positions,
+          boardId
+        );
+      }
+    } else {
+      this.ai.recordMiss(layer, targetIndex);
+    }
+
+    // Update the board visually
+    this.ui.updateBoard({
+      boardId: boardId,
+      index: targetIndex,
+      hit: result.hit,
+      sunk: result.sunk,
+      shipType: result.shipType
+    });
+  });
+
+  // Update commentary
+  if (hitCount > 0) {
+    let message = `AI used Krypton Laser and hit ${hitCount} target${hitCount > 1 ? 's' : ''}`;
+    if (sunkCount > 0) {
+      message += ` and destroyed ${sunkCount} ship${sunkCount > 1 ? 's' : ''}`;
+    }
+    message += "!";
+    this.ui.updateCommentary(message);
+  } else {
+    this.ui.updateCommentary("AI used Krypton Laser but missed all targets!");
+  }
+
+  this.ui.updateScoreBoard();
+
+  // Check for game over
+  for (const result of results) {
+    if (result.gameOver && result.gameOver.isOver) {
+      this.sound.playSound('defeat');
+      this.aiWins++;
+      this.ui.updateScoreBoard();
+      this.gameState.phase = 'gameOver';
+      this.isProcessingTurn = false;
+      this.ui.showGameOver(result.gameOver);
+      return;
+    }
+  }
+}
+
 aiUseCannonBall() {
   // AI targets a 2×2 area on the sea layer
   const moveInfo = this.ai.calculateMove(this.gameState.boards.player);
-  let targetPosition = moveInfo && moveInfo.layer === 'Sea' 
-    ? moveInfo.index 
+  let targetPosition = moveInfo && moveInfo.layer === 'Sea'
+    ? moveInfo.index
     : Math.floor(Math.random() * 16); // Random position if no good sea move
-  
+
   // Find a good spot for 2×2 attack (ensure it fits on board)
   const boardSize = GAME_CONSTANTS.BOARD_SIZE;
   const row = Math.floor(targetPosition / boardSize);
   const col = targetPosition % boardSize;
-  
+
   // Make sure we don't exceed board boundaries
   const adjustedRow = row + 1 < boardSize ? row : row - 1;
   const adjustedCol = col + 1 < boardSize ? col : col - 1;
-  
+
   // Attack 2×2 area
   let hitCount = 0;
-  
+  let sunkCount = 0;
+  const results = [];
+
   for (let r = adjustedRow; r < adjustedRow + 2; r++) {
     for (let c = adjustedCol; c < adjustedCol + 2; c++) {
       const attackIndex = r * boardSize + c;
-      
+
       // Skip if already attacked
       if (this.ai.attackedPositions.Sea.has(attackIndex)) {
         continue;
       }
-      
+
       const result = this.gameState.processAttack('playerSeaBoard', attackIndex, 'Sea');
-      
+      results.push(result);
+
       // Update AI's knowledge
       if (result.hit) {
         this.ai.recordHit('Sea', attackIndex);
         hitCount++;
+        if (result.sunk) {
+          sunkCount++;
+          this.sound.playSound('sunk');
+          this.animations.playSunkAnimation(
+            this.gameState.ships.player[result.shipType].positions,
+            'playerSeaBoard'
+          );
+        }
       } else {
         this.ai.recordMiss('Sea', attackIndex);
       }
-      
+
       // Update the board
       this.ui.updateBoard({
         boardId: 'playerSeaBoard',
@@ -811,8 +920,33 @@ aiUseCannonBall() {
       });
     }
   }
-  
-  this.ui.updateCommentary(`AI used Cannon Ball on your Sea layer, hitting ${hitCount} targets!`);
+
+  // Update commentary
+  if (hitCount > 0) {
+    let message = `AI used Cannon Ball and hit ${hitCount} target${hitCount > 1 ? 's' : ''}`;
+    if (sunkCount > 0) {
+      message += ` and destroyed ${sunkCount} ship${sunkCount > 1 ? 's' : ''}`;
+    }
+    message += "!";
+    this.ui.updateCommentary(message);
+  } else {
+    this.ui.updateCommentary("AI used Cannon Ball but missed all targets!");
+  }
+
+  this.ui.updateScoreBoard();
+
+  // Check for game over after cannonball attack
+  for (const result of results) {
+    if (result.gameOver && result.gameOver.isOver) {
+      this.sound.playSound('defeat');
+      this.aiWins++;
+      this.ui.updateScoreBoard();
+      this.gameState.phase = 'gameOver';
+      this.isProcessingTurn = false;
+      this.ui.showGameOver(result.gameOver);
+      return;
+    }
+  }
 }
 
   createGameBoards() {
@@ -1352,26 +1486,44 @@ startNewGame(mode) {
   handleAttackResult(data) {
     // I attacked, here is the result
     const result = data.result;
-    
+
     // Track my hit locally
     if (result.hit) {
       this.gameState.shots.player.hits++;
     }
-    
+
     // Use updateBoard but map boardId to opponent
     result.boardId = result.boardId.replace('player', 'opponent'); // Transform ID
-    
+
+    // CRITICAL: Update local ship state for win condition detection
+    if (result.hit && result.shipType && this.gameState.ships.opponent[result.shipType]) {
+      const ship = this.gameState.ships.opponent[result.shipType];
+      // Add the hit position if not already tracked
+      if (!ship.hits.includes(result.index)) {
+        ship.hits.push(result.index);
+      }
+      // Mark ship as sunk if result says it's sunk
+      if (result.sunk) {
+        ship.isSunk = true;
+      }
+    }
+
     this.ui.updateBoard(result);
     this.sound.playSound(result.hit ? 'hit' : 'miss');
     if (result.sunk) this.sound.playSound('sunk');
-    
-    if (result.gameOver.isOver) {
+
+    // Check game over locally as well (in case remote result is incorrect)
+    const localGameOver = this.gameState.checkGameOver();
+    const isGameOver = result.gameOver.isOver || localGameOver.isOver;
+
+    if (isGameOver) {
        // I won - I destroyed all opponent's ships
        this.gameState.phase = 'gameOver';
        this.isProcessingTurn = false;
        // Adjust winner for online mode display
        const gameOverResult = {
          ...result.gameOver,
+         isOver: true,
          winner: 'player', // I won
          mode: 'online'
        };
@@ -1634,37 +1786,31 @@ startCombatPhase() {
     
     // Handle treasure chest discovery
     if (result.treasure) {
-    this.sound.playSound('hit');
-    this.ui.updateBoard({
-      boardId: result.boardId,
-      index: result.index,
-      hit: true,
-      treasure: true
-    });
+      this.sound.playSound('hit');
+      this.ui.updateBoard({
+        boardId: result.boardId,
+        index: result.index,
+        hit: true,
+        treasure: true
+      });
 
-    if (boardId.includes('opponent')) {
-      // Player found a treasure chest.
-      this.ui.updateCommentary("You found a treasure chest!");
-      this.animateCommentaryBox();
-      this.ui.showTreasureMenu();
-      this.isProcessingTurn = false; // Let the player choose a power-up.
-    } else {
-      // AI found a treasure chest.
-      this.ui.updateCommentary("AI found a treasure chest!");
-      this.animateCommentaryBox();
-      setTimeout(() => {
-        this.handleAIPowerupSelection();
-        // After AI selects its power-up, continue its turn:
-        setTimeout(() => {
-          if (this.gameState.phase !== 'gameOver') {
-            this.handleAITurn();
-          }
-        }, 1500);
+      // In handleAttack (player click), treasure is always found by the clicking player
+      // Whether they attack opponent board (AI or human) or player board (human vs human mode)
+      if (this.gameState.gameMode === 'human') {
+        // Human vs Human mode - current player found treasure
+        this.ui.updateCommentary(`Player ${this.gameState.currentPlayer} found a treasure chest!`);
+        this.animateCommentaryBox();
+        this.ui.showTreasureMenu();
         this.isProcessingTurn = false;
-      }, 1500);
+      } else {
+        // AI mode - player found treasure on opponent's board
+        this.ui.updateCommentary("You found a treasure chest!");
+        this.animateCommentaryBox();
+        this.ui.showTreasureMenu();
+        this.isProcessingTurn = false;
+      }
+      return;
     }
-    return;
-  }
     
     this.sound.playSound(result.hit ? 'hit' : 'miss');
     this.ui.updateBoard(result);
@@ -1818,17 +1964,17 @@ handleAITurn() {
           hit: true,
           treasure: true
         });
-        
+
         this.ui.updateCommentary("AI found a treasure chest!");
         this.animateCommentaryBox();
-        
+
         // AI selects a power-up based on game state
+        // Keep isProcessingTurn = true until powerup is fully activated
         setTimeout(() => {
           this.handleAIPowerupSelection();
-          // AI's turn ends after selecting powerup
-          this.isProcessingTurn = false;
+          // isProcessingTurn will be set to false inside handleAIPowerupSelection after powerup is used
         }, 1500);
-        
+
         return;
       }
       
