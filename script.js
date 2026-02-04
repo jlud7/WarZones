@@ -140,12 +140,15 @@ activateBlackBox() {
     // Update UI
     e.target.classList.add('ship');
     e.target.textContent = GAME_CONSTANTS.SHIPS.FighterJet.symbol;
-    
+
+    // Play placement sound
+    this.sound.playSound('place');
+
     // Cleanup
     playerSkyBoard.removeEventListener('click', placeJet);
     playerSkyBoard.classList.remove('powerup-target-board');
     this.gameState.pendingPowerup = null;
-    
+
     this.ui.updateCommentary("Extra jet placed! Your turn continues.");
   };
   
@@ -297,7 +300,7 @@ activateKryptonLaser() {
           cell.classList.remove('ship');
           cell.classList.add('hit');
           cell.textContent = '💥';
-          
+
           if (result.sunk) {
             sunkCount++;
             game.ui.animateSunkShip(result.shipType, boardId);
@@ -305,10 +308,13 @@ activateKryptonLaser() {
           } else {
             game.sound.playSound('hit');
           }
+          game.animations.playExplosion(cell);
+          game.animations.playScreenShake(false);
         } else {
           cell.classList.add('miss');
           cell.textContent = 'O';
           game.sound.playSound('miss');
+          game.animations.playSplash(cell);
         }
       }
     });
@@ -493,13 +499,33 @@ activateCannonBall() {
     for (const targetIndex of validAttackPositions) {
       const result = this.gameState.processAttack('opponentSeaBoard', targetIndex, 'Sea');
       results.push(result);
-      
+
       // Update the board visually
       this.ui.updateBoard(result);
-      
-      // Count hits and sunk ships
-      if (result.hit) hitCount++;
-      if (result.sunk) sunkCount++;
+
+      // Play sound and animation for each cell
+      if (result.hit) {
+        hitCount++;
+        if (result.sunk) {
+          sunkCount++;
+          this.sound.playSound('sunk');
+          this.animations.playSunkAnimation(
+            this.gameState.ships.opponent[result.shipType].positions,
+            'opponentSeaBoard'
+          );
+        } else {
+          this.sound.playSound('hit');
+        }
+        this.animations.playExplosion(
+          document.querySelector(`#opponentSeaBoard .cell[data-index="${targetIndex}"]`)
+        );
+        this.animations.playScreenShake(false);
+      } else {
+        this.sound.playSound('miss');
+        this.animations.playSplash(
+          document.querySelector(`#opponentSeaBoard .cell[data-index="${targetIndex}"]`)
+        );
+      }
       attackedCellCount++;
     }
     
@@ -3579,10 +3605,8 @@ recordShipDetection(layer, index) {
       return this.handleSubLayerLogic(gameBoard);
     }
     
-    // Next priority: attack Sky layer if we haven't found the fighter jet
-    // In calculateMove, add this logic before checking other layers
-    if (this.layerState.Sky.hits.length > 0 && (!this.layerState.Sky.foundSecondJet || this.layerState.Sky.hits.length < 2)) {
-      // Always check for a second jet if we've only found one
+    // Next priority: attack Sky layer if we haven't completed it
+    if (!this.shipCompleted('Sky') && this.layerState.Sky.hits.length > 0) {
       const skyMove = this.getOptimalSkyMove(gameBoard);
       if (skyMove !== null) {
         return { layer: 'Sky', index: skyMove };
@@ -4301,27 +4325,26 @@ recordShipDetection(layer, index) {
   
 shipCompleted(layer) {
   if (layer === 'Sky') {
-    // Check if we've found all jets in the sky layer
-    // Count regular FighterJet
-    const regularJet = this.layerState.Sky.hits.some(index => {
-      // Access boards directly from gameState, not through this.game
-      const boards = this.attackedPositions.Sky;
-      return boards.has(index) && boards.size > 0;
-    });
-      
-    // Count ExtraJet positions - look for any cells with ExtraJet
-    const allSkyPositions = [];
-    for (let i = 0; i < this.boardSize * this.boardSize; i++) {
-      allSkyPositions.push(i);
+    // No hits yet - not completed
+    if (this.layerState.Sky.hits.length === 0) return false;
+
+    // Regular FighterJet is 1 cell - 1 hit sinks it
+    // Check if player has an ExtraJet (from BlackBox powerup)
+    try {
+      const game = this.game || window.warZonesGame;
+      if (game && game.gameState && game.gameState.ships.player['ExtraJet']) {
+        const extraJet = game.gameState.ships.player['ExtraJet'];
+        if (!extraJet.isSunk && extraJet.positions.length > 0) {
+          // ExtraJet exists and isn't sunk yet - need 2 hits total
+          return this.layerState.Sky.hits.length >= 2;
+        }
+      }
+    } catch (e) {
+      // Fallback - if we can't check, 1 hit is enough
     }
-    
-    // Consider all possible positions and check if we've found jets
-    const allPositionsChecked = allSkyPositions.every(pos => 
-      this.attackedPositions.Sky.has(pos));
-      
-    // Return true only if we've hit at least one jet AND checked all positions
-    // or if the regular jet is hit and no other jets exist
-    return regularJet && (this.layerState.Sky.hits.length >= 2 || allPositionsChecked);
+
+    // No ExtraJet or ExtraJet already sunk - 1 hit completes sky
+    return true;
   }
   
   // For other layers, use standard logic but exclude treasure chests
@@ -4487,6 +4510,17 @@ class UIController {
   }
   
 showTreasureMenu() {
+  // Check if BlackBox is usable - need at least one empty cell in player's sky board
+  const skyBoard = this.game.gameState.boards.player.Sky;
+  const hasEmptySkyCell = skyBoard.some((cell, i) => {
+    if (cell !== null) return false; // occupied by ship or extra jet
+    // Also check if the cell was attacked (hit/miss)
+    const cellEl = document.querySelector(`#playerSkyBoard .cell[data-index="${i}"]`);
+    return cellEl && !cellEl.classList.contains('hit') && !cellEl.classList.contains('miss');
+  });
+
+  const blackBoxDisabled = !hasEmptySkyCell;
+
   const overlay = document.createElement('div');
   overlay.className = 'game-over-overlay';
   overlay.id = 'treasureOverlay';
@@ -4494,20 +4528,20 @@ showTreasureMenu() {
     <div class="treasure-content">
       <h2>Treasure Found!</h2>
       <p>Choose one power-up:</p>
-      
+
       <div class="powerup-options">
-        <div class="powerup-option" data-powerup="BlackBox">
+        <div class="powerup-option${blackBoxDisabled ? ' powerup-disabled' : ''}" data-powerup="BlackBox">
           <div class="powerup-icon">${GAME_CONSTANTS.POWERUPS.BlackBox.icon}</div>
           <div class="powerup-name">${GAME_CONSTANTS.POWERUPS.BlackBox.name}</div>
-          <div class="powerup-desc">${GAME_CONSTANTS.POWERUPS.BlackBox.description}</div>
+          <div class="powerup-desc">${blackBoxDisabled ? 'No empty sky squares available' : GAME_CONSTANTS.POWERUPS.BlackBox.description}</div>
         </div>
-        
+
         <div class="powerup-option" data-powerup="KryptonLaser">
           <div class="powerup-icon">${GAME_CONSTANTS.POWERUPS.KryptonLaser.icon}</div>
           <div class="powerup-name">${GAME_CONSTANTS.POWERUPS.KryptonLaser.name}</div>
           <div class="powerup-desc">${GAME_CONSTANTS.POWERUPS.KryptonLaser.description}</div>
         </div>
-        
+
         <div class="powerup-option" data-powerup="CannonBall">
           <div class="powerup-icon">${GAME_CONSTANTS.POWERUPS.CannonBall.icon}</div>
           <div class="powerup-name">${GAME_CONSTANTS.POWERUPS.CannonBall.name}</div>
@@ -4516,11 +4550,12 @@ showTreasureMenu() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(overlay);
-  
+
   // Add event listeners to power-up options
   overlay.querySelectorAll('.powerup-option').forEach(option => {
+    if (option.classList.contains('powerup-disabled')) return; // Skip disabled options
     option.addEventListener('click', () => {
       const powerupType = option.dataset.powerup;
       this.game.activatePowerup(powerupType);
