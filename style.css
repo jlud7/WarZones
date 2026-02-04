@@ -2103,6 +2103,312 @@ body {
   to { opacity: 0; pointer-events: none; }
 }
 
+/* === Explosion Effects === */
+.explosion-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  overflow: visible;
+}
+
+.explosion-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.explosion-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 82, 82, 0.8);
+  pointer-events: none;
+  animation: explosionRing 0.6s ease-out forwards;
+}
+
+@keyframes explosionRing {
+  0% { width: 0; height: 0; opacity: 1; transform: translate(-50%, -50%) scale(0); }
+  100% { width: 80px; height: 80px; opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+.explosion-flash {
+  position: absolute;
+  inset: -4px;
+  border-radius: 4px;
+  background: radial-gradient(circle, rgba(255, 200, 50, 0.9), rgba(255, 82, 82, 0.6), transparent 70%);
+  pointer-events: none;
+  animation: explosionFlash 0.35s ease-out forwards;
+}
+
+@keyframes explosionFlash {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(2); }
+}
+
+/* Miss splash effect */
+.miss-splash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  overflow: visible;
+}
+
+.splash-drop {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(106, 183, 255, 0.7);
+  pointer-events: none;
+}
+
+.splash-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  border: 1px solid rgba(106, 183, 255, 0.5);
+  pointer-events: none;
+  animation: splashRing 0.5s ease-out forwards;
+}
+
+@keyframes splashRing {
+  0% { width: 0; height: 0; opacity: 0.8; transform: translate(-50%, -50%) scale(0); }
+  100% { width: 50px; height: 50px; opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* === Screen Shake === */
+.screen-shake {
+  animation: screenShake 0.4s ease-out;
+}
+
+@keyframes screenShake {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-4px, 2px); }
+  20% { transform: translate(4px, -2px); }
+  30% { transform: translate(-3px, -1px); }
+  40% { transform: translate(3px, 1px); }
+  50% { transform: translate(-2px, 2px); }
+  60% { transform: translate(2px, -1px); }
+  70% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  90% { transform: translate(-1px, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+.screen-shake-heavy {
+  animation: screenShakeHeavy 0.5s ease-out;
+}
+
+@keyframes screenShakeHeavy {
+  0% { transform: translate(0, 0) rotate(0); }
+  10% { transform: translate(-6px, 3px) rotate(-0.5deg); }
+  20% { transform: translate(6px, -4px) rotate(0.5deg); }
+  30% { transform: translate(-5px, -2px) rotate(-0.3deg); }
+  40% { transform: translate(4px, 3px) rotate(0.3deg); }
+  50% { transform: translate(-3px, 2px) rotate(-0.2deg); }
+  60% { transform: translate(3px, -2px) rotate(0.2deg); }
+  70% { transform: translate(-2px, 1px) rotate(0); }
+  80% { transform: translate(1px, -1px); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+
+/* === Sunk Ship Dramatic Effect === */
+.cell.sinking {
+  animation: shipSink 0.8s ease-in forwards;
+}
+
+@keyframes shipSink {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  30% { transform: scale(1.1) rotate(3deg); opacity: 1; }
+  60% { transform: scale(0.9) rotate(-5deg); opacity: 0.7; }
+  100% { transform: scale(0.75) rotate(8deg); opacity: 0.5; filter: brightness(0.4) saturate(0.3); }
+}
+
+.cell.sunk {
+  animation: sunkPulse 2s infinite alternate;
+  transform: scale(0.75) rotate(8deg);
+  opacity: 0.5;
+  filter: brightness(0.4) saturate(0.3);
+}
+
+/* === Victory Confetti Canvas === */
+.confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2001;
+}
+
+/* Victory-specific game over styling */
+.game-over-overlay.victory-overlay {
+  background: rgba(0, 20, 0, 0.5);
+}
+
+.game-over-overlay.victory-overlay .game-over-content {
+  border-color: var(--success-color);
+  box-shadow: 0 0 40px rgba(0, 200, 83, 0.4), 0 0 80px rgba(0, 200, 83, 0.1);
+}
+
+.game-over-overlay.victory-overlay h2 {
+  background: linear-gradient(to right, #ffd700, #ff6b35, #ffd700);
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: victoryTextGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes victoryTextGlow {
+  0% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); filter: brightness(1); }
+  100% { text-shadow: 0 0 25px rgba(255, 215, 0, 0.8), 0 0 50px rgba(255, 107, 53, 0.4); filter: brightness(1.2); }
+}
+
+/* Defeat styling */
+.game-over-overlay.defeat-overlay {
+  background: rgba(20, 0, 0, 0.5);
+}
+
+.game-over-overlay.defeat-overlay .game-over-content {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 40px rgba(255, 82, 82, 0.3);
+}
+
+.game-over-overlay.defeat-overlay h2 {
+  background: linear-gradient(to right, #ff5252, #b71c1c);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* === AI Thinking Indicator === */
+.ai-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ai-thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.ai-thinking-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  animation: thinkingDot 1.2s ease-in-out infinite;
+}
+
+.ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinkingDot {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Scanning overlay on player boards during AI turn */
+.board.ai-scanning::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  animation: aiScanLine 1s ease-in-out infinite;
+  z-index: 15;
+  pointer-events: none;
+}
+
+@keyframes aiScanLine {
+  0% { top: 0; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* === Phase Transition === */
+.phase-transition-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1800;
+  animation: phaseTransitionIn 0.4s ease-out;
+}
+
+.phase-transition-overlay.exit {
+  animation: phaseTransitionOut 0.4s ease-in forwards;
+}
+
+@keyframes phaseTransitionIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes phaseTransitionOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.phase-transition-text {
+  font-size: 2.5rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  background: linear-gradient(to right, var(--primary-light), var(--accent-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: phaseTextPulse 0.8s ease-in-out;
+}
+
+.phase-transition-sub {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  animation: phaseSubFadeIn 0.4s ease-out 0.3s forwards;
+}
+
+@keyframes phaseTextPulse {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes phaseSubFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustments for new effects */
+@media (max-width: 768px) {
+  .phase-transition-text { font-size: 1.8rem; }
+  .phase-transition-sub { font-size: 0.75rem; }
+  .explosion-ring { animation-duration: 0.4s; }
+}
+
+@media (max-width: 480px) {
+  .phase-transition-text { font-size: 1.4rem; }
+}
+
 /* Responsive adjustments for new elements */
 @media (max-width: 768px) {
   .keyboard-hint { display: none !important; }
