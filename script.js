@@ -1634,6 +1634,7 @@ startNewGame(mode) {
     this.ui.updateGameInfo(message);
     this.ui.updateCommentary(message);
     this.ui.highlightPlacementBoard();
+    this.ui.renderFleetDock();
 
     this.animateCommentaryBox();
     this.startGameTimer();
@@ -1718,10 +1719,11 @@ startNewGame(mode) {
       // Deactivate keyboard nav from placement phase
       this.deactivateKeyboard();
 
-      // Clear placement highlights
+      // Clear placement highlights and fleet dock
       document.querySelectorAll('.board-section.placement-active').forEach(section => {
         section.classList.remove('placement-active');
       });
+      this.ui.hideFleetDock();
   }
 
   handleIncomingAttack(data) {
@@ -1847,19 +1849,23 @@ startNewGame(mode) {
         }
       });
       
-      // Update the commentary
+      // Update the commentary and fleet dock
       const nextShip = this.gameState.getCurrentShip();
       if (nextShip) {
         const player = this.gameState.gameMode === 'human'
           ? `Player ${this.gameState.currentPlayer}: `
           : '';
-        this.ui.updateCommentary(`${player}Place your ${nextShip}`);
+        const nextConfig = GAME_CONSTANTS.SHIPS[nextShip];
+        const sizeDesc = nextConfig.size === 1 ? '1 cell' : `${nextConfig.size} cells`;
+        this.ui.updateCommentary(`${player}Place your ${nextShip} (${sizeDesc}) on the ${nextConfig.layer} board`);
         this.ui.highlightPlacementBoard();
       }
-      
+      this.ui.updateFleetDock();
+
       if (this.gameState.isPlacementComplete()) {
-        // Hide undo button
+        // Hide undo button and fleet dock
         document.getElementById('undoMove').style.display = 'none';
+        this.ui.hideFleetDock();
         
         if (this.gameState.gameMode === 'online') {
            this.ui.updateCommentary("Waiting for opponent...");
@@ -1891,9 +1897,13 @@ startNewGame(mode) {
               document.querySelectorAll('.player-score')[1].classList.add('active');
               
               // Update commentary for player two's setup
-              this.ui.updateCommentary(`Player Two: Place your ${this.gameState.getCurrentShip()} on your board.`);
+              const p2Ship = this.gameState.getCurrentShip();
+              const p2Config = GAME_CONSTANTS.SHIPS[p2Ship];
+              const p2Size = p2Config.size === 1 ? '1 cell' : `${p2Config.size} cells`;
+              this.ui.updateCommentary(`Player Two: Place your ${p2Ship} (${p2Size}) on the ${p2Config.layer} board`);
               this.ui.updateGameInfo(`Player Two: Place your ships on your board.`);
               this.ui.highlightPlacementBoard();
+              this.ui.renderFleetDock();
               this.animateCommentaryBox();
               
               document.getElementById('undoMove').style.display = 'inline-block';
@@ -1936,10 +1946,11 @@ _initCombat() {
   this.gameState.phase = 'combat';
   this.gameState.currentPlayer = 1; // Always start with player 1 in combat
 
-  // Clear placement highlights
+  // Clear placement highlights and fleet dock
   document.querySelectorAll('.board-section.placement-active').forEach(section => {
     section.classList.remove('placement-active');
   });
+  this.ui.hideFleetDock();
 
   if (this.gameState.gameMode === 'ai') {
     const opponentBoards = document.querySelector('.opponent-boards');
@@ -2381,9 +2392,12 @@ handleAITurn() {
       const player = this.gameState.gameMode === 'human'
         ? `Player ${this.gameState.currentPlayer}: `
         : '';
+      const shipConfig = GAME_CONSTANTS.SHIPS[shipType];
+      const sizeDesc = shipConfig.size === 1 ? '1 cell' : `${shipConfig.size} cells`;
 
-      this.ui.updateCommentary(`${player}Place your ${shipType}`);
+      this.ui.updateCommentary(`${player}Place your ${shipType} (${sizeDesc}) on the ${shipConfig.layer} board`);
       this.ui.highlightPlacementBoard();
+      this.ui.updateFleetDock();
       this.ui.updateScoreBoard();
     }
   }
@@ -4663,6 +4677,7 @@ showSonarEffect(side, layer, centerIndex) {
     document.getElementById('gameMenu').style.display = 'flex';
     document.getElementById('shipCounter').classList.remove('visible');
     document.getElementById('keyboardHint').classList.remove('visible');
+    this.hideFleetDock();
     // Reset online menu state to main buttons
     document.getElementById('mainMenuButtons').classList.remove('hidden');
     document.getElementById('onlineMenuButtons').classList.add('hidden');
@@ -4718,6 +4733,81 @@ showSonarEffect(side, layer, centerIndex) {
         boardSection.classList.add('placement-active');
       }
     }
+  }
+
+  // === Fleet Dock ===
+  renderFleetDock() {
+    const dock = document.getElementById('fleetDock');
+    const container = document.getElementById('fleetDockShips');
+    if (!dock || !container) return;
+
+    const shipTypes = Object.keys(GAME_CONSTANTS.SHIPS);
+    container.innerHTML = '';
+
+    shipTypes.forEach((shipType, index) => {
+      const config = GAME_CONSTANTS.SHIPS[shipType];
+      const el = document.createElement('div');
+      el.className = 'dock-ship upcoming';
+      el.dataset.ship = shipType;
+      el.dataset.layer = config.layer;
+      el.dataset.index = index;
+
+      // Build the mini shape grid
+      const shapeEl = document.createElement('div');
+      const shapeClass = `dock-ship-shape shape-${config.shape}`;
+      const sizeClass = config.shape === 'line' ? ` size-${config.size}` : '';
+      shapeEl.className = shapeClass + sizeClass;
+
+      for (let i = 0; i < config.size; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'dock-ship-cell';
+        shapeEl.appendChild(cell);
+      }
+
+      // Ship name
+      const nameEl = document.createElement('div');
+      nameEl.className = 'dock-ship-name';
+      nameEl.textContent = shipType;
+
+      // Layer label
+      const layerEl = document.createElement('div');
+      layerEl.className = 'dock-ship-layer';
+      layerEl.textContent = config.layer;
+
+      el.appendChild(shapeEl);
+      el.appendChild(nameEl);
+      el.appendChild(layerEl);
+      container.appendChild(el);
+    });
+
+    dock.classList.remove('hidden');
+    this.updateFleetDock();
+  }
+
+  updateFleetDock() {
+    const dock = document.getElementById('fleetDock');
+    if (!dock) return;
+
+    const currentIndex = this.game.gameState.currentShipIndex;
+    const shipTypes = Object.keys(GAME_CONSTANTS.SHIPS);
+
+    dock.querySelectorAll('.dock-ship').forEach(el => {
+      const index = parseInt(el.dataset.index);
+      el.classList.remove('placed', 'current', 'upcoming');
+
+      if (index < currentIndex) {
+        el.classList.add('placed');
+      } else if (index === currentIndex) {
+        el.classList.add('current');
+      } else {
+        el.classList.add('upcoming');
+      }
+    });
+  }
+
+  hideFleetDock() {
+    const dock = document.getElementById('fleetDock');
+    if (dock) dock.classList.add('hidden');
   }
 
   clearBoards() {
@@ -4777,7 +4867,9 @@ showSonarEffect(side, layer, centerIndex) {
     if (!shipType) return;
   
     // Update commentary with current ship being placed
-    this.updateCommentary(`Place your ${shipType}`);
+    const config = GAME_CONSTANTS.SHIPS[shipType];
+    const sizeDesc = config.size === 1 ? '1 cell' : `${config.size} cells`;
+    this.updateCommentary(`Place your ${shipType} (${sizeDesc}) on the ${config.layer} board`);
 
     // Clear all previous highlights on this board only
     board.querySelectorAll('.cell').forEach(c => {
