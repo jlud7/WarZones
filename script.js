@@ -59,6 +59,14 @@ class WarZones {
     this.aiTurnTimeouts = []; // Track AI turn timeouts
     this.isProcessingTurn = false; // Flag to prevent multiple attacks
 
+    // Keyboard navigation state
+    this.keyboard = {
+      active: false,           // Whether keyboard nav is engaged
+      layerIndex: 0,           // Current layer (0-3 maps to LAYERS array)
+      cellIndex: 0,            // Current cell (0-15 for 4x4 grid)
+      side: 'opponent'         // Which side boards we're navigating ('player' or 'opponent')
+    };
+
     // Also set a global reference that can be used as fallback
     window.warZonesGame = this;
 
@@ -73,6 +81,17 @@ class WarZones {
   }
   
 activatePowerup(powerupType) {
+  // Show powerup notification
+  this.showPowerupNotification(powerupType, false);
+
+  // In online mode, notify opponent of powerup selection
+  if (this.gameState.gameMode === 'online' && this.network.isConnected) {
+    this.network.send({
+      type: 'POWERUP_USED',
+      powerup: powerupType
+    });
+  }
+
   switch(powerupType) {
     case 'BlackBox':
       this.activateBlackBox();
@@ -80,7 +99,7 @@ activatePowerup(powerupType) {
     case 'KryptonLaser':
       this.activateKryptonLaser();
       break;
-    case 'CannonBall':  // Changed from SonarPulse
+    case 'CannonBall':
       this.activateCannonBall();
       break;
   }
@@ -949,6 +968,230 @@ aiUseCannonBall() {
   }
 }
 
+  // === Keyboard Navigation ===
+  activateKeyboard() {
+    if (this.keyboard.active) return;
+    this.keyboard.active = true;
+
+    // Determine which side to navigate based on phase
+    if (this.gameState.phase === 'setup') {
+      // During setup, navigate player boards (or opponent for player 2 in local)
+      this.keyboard.side = (this.gameState.gameMode === 'human' && this.gameState.currentPlayer === 2) ? 'opponent' : 'player';
+      // Start on the layer of the current ship being placed
+      const currentShip = this.gameState.getCurrentShip();
+      if (currentShip) {
+        const layerName = GAME_CONSTANTS.SHIPS[currentShip].layer;
+        this.keyboard.layerIndex = GAME_CONSTANTS.LAYERS.indexOf(layerName);
+      }
+    } else if (this.gameState.phase === 'combat') {
+      // During combat, navigate opponent boards to attack
+      if (this.gameState.gameMode === 'human' && this.gameState.currentPlayer === 2) {
+        this.keyboard.side = 'player';
+      } else {
+        this.keyboard.side = 'opponent';
+      }
+    }
+
+    this.updateKeyboardCursor();
+    this.updateKeyboardHint();
+  }
+
+  deactivateKeyboard() {
+    this.keyboard.active = false;
+    // Remove all cursor highlights
+    document.querySelectorAll('.cell.keyboard-cursor').forEach(c => c.classList.remove('keyboard-cursor'));
+    document.querySelectorAll('.board-section.keyboard-active-layer').forEach(s => s.classList.remove('keyboard-active-layer'));
+    document.getElementById('keyboardHint').classList.remove('visible');
+  }
+
+  updateKeyboardCursor() {
+    // Clear old cursor
+    document.querySelectorAll('.cell.keyboard-cursor').forEach(c => c.classList.remove('keyboard-cursor'));
+    document.querySelectorAll('.board-section.keyboard-active-layer').forEach(s => s.classList.remove('keyboard-active-layer'));
+
+    if (!this.keyboard.active) return;
+
+    const layer = GAME_CONSTANTS.LAYERS[this.keyboard.layerIndex];
+    const boardId = `${this.keyboard.side}${layer}Board`;
+    const board = document.getElementById(boardId);
+    if (!board) return;
+
+    const cell = board.querySelector(`.cell[data-index="${this.keyboard.cellIndex}"]`);
+    if (cell) {
+      cell.classList.add('keyboard-cursor');
+    }
+
+    // Highlight the active layer label
+    const boardSection = board.closest('.board-section');
+    if (boardSection) {
+      boardSection.classList.add('keyboard-active-layer');
+    }
+  }
+
+  updateKeyboardHint() {
+    const hint = document.getElementById('keyboardHint');
+    if (!hint) return;
+
+    if (!this.keyboard.active) {
+      hint.classList.remove('visible');
+      return;
+    }
+
+    hint.classList.add('visible');
+    if (this.gameState.phase === 'setup') {
+      hint.innerHTML = `<kbd>Arrow Keys</kbd> Move &nbsp; <kbd>1</kbd>-<kbd>4</kbd> Switch Layer &nbsp; <kbd>Space</kbd> Place Ship &nbsp; <kbd>R</kbd> Rotate &nbsp; <kbd>Esc</kbd> Menu`;
+    } else if (this.gameState.phase === 'combat') {
+      hint.innerHTML = `<kbd>Arrow Keys</kbd> Move &nbsp; <kbd>1</kbd>-<kbd>4</kbd> Switch Layer &nbsp; <kbd>Space</kbd> Attack &nbsp; <kbd>Esc</kbd> Menu`;
+    }
+  }
+
+  handleKeyboardNav(e) {
+    // Don't handle if a menu/overlay is visible
+    if (document.getElementById('gameMenu').style.display !== 'none' &&
+        document.getElementById('gameMenu').style.display !== '') return false;
+    if (document.querySelector('.game-over-overlay')) return false;
+    if (document.getElementById('treasureOverlay')) return false;
+
+    // Only during setup or combat
+    if (this.gameState.phase !== 'setup' && this.gameState.phase !== 'combat') return false;
+
+    const boardSize = GAME_CONSTANTS.BOARD_SIZE;
+
+    switch (e.key) {
+      case 'ArrowUp': {
+        e.preventDefault();
+        if (!this.keyboard.active) { this.activateKeyboard(); return true; }
+        const row = Math.floor(this.keyboard.cellIndex / boardSize);
+        if (row > 0) this.keyboard.cellIndex -= boardSize;
+        this.updateKeyboardCursor();
+        return true;
+      }
+      case 'ArrowDown': {
+        e.preventDefault();
+        if (!this.keyboard.active) { this.activateKeyboard(); return true; }
+        const row = Math.floor(this.keyboard.cellIndex / boardSize);
+        if (row < boardSize - 1) this.keyboard.cellIndex += boardSize;
+        this.updateKeyboardCursor();
+        return true;
+      }
+      case 'ArrowLeft': {
+        e.preventDefault();
+        if (!this.keyboard.active) { this.activateKeyboard(); return true; }
+        const col = this.keyboard.cellIndex % boardSize;
+        if (col > 0) this.keyboard.cellIndex -= 1;
+        this.updateKeyboardCursor();
+        return true;
+      }
+      case 'ArrowRight': {
+        e.preventDefault();
+        if (!this.keyboard.active) { this.activateKeyboard(); return true; }
+        const col = this.keyboard.cellIndex % boardSize;
+        if (col < boardSize - 1) this.keyboard.cellIndex += 1;
+        this.updateKeyboardCursor();
+        return true;
+      }
+      case '1': case '2': case '3': case '4': {
+        if (!this.keyboard.active) { this.activateKeyboard(); }
+        const newLayerIndex = parseInt(e.key) - 1;
+        this.keyboard.layerIndex = newLayerIndex;
+        this.updateKeyboardCursor();
+        this.updateKeyboardHint();
+        return true;
+      }
+      case ' ': {
+        e.preventDefault();
+        if (!this.keyboard.active) { this.activateKeyboard(); return true; }
+        this.handleKeyboardAction();
+        return true;
+      }
+      case 'Enter': {
+        e.preventDefault();
+        if (!this.keyboard.active) { this.activateKeyboard(); return true; }
+        this.handleKeyboardAction();
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
+  handleKeyboardAction() {
+    const layer = GAME_CONSTANTS.LAYERS[this.keyboard.layerIndex];
+    const boardId = `${this.keyboard.side}${layer}Board`;
+    const board = document.getElementById(boardId);
+    if (!board) return;
+
+    const cell = board.querySelector(`.cell[data-index="${this.keyboard.cellIndex}"]`);
+    if (!cell) return;
+
+    if (this.gameState.phase === 'setup') {
+      // Trigger placement
+      this.handleShipPlacement(boardId, this.keyboard.cellIndex, layer);
+      // Update cursor to next ship's layer
+      const nextShip = this.gameState.getCurrentShip();
+      if (nextShip) {
+        const nextLayer = GAME_CONSTANTS.SHIPS[nextShip].layer;
+        this.keyboard.layerIndex = GAME_CONSTANTS.LAYERS.indexOf(nextLayer);
+        this.updateKeyboardCursor();
+        this.updateKeyboardHint();
+      }
+    } else if (this.gameState.phase === 'combat') {
+      // Simulate a click on that cell for attack
+      cell.click();
+    }
+  }
+
+  // === Ship Counter ===
+  updateShipCounter() {
+    const counter = document.getElementById('shipCounter');
+    if (!counter) return;
+
+    if (this.gameState.phase !== 'combat' && this.gameState.phase !== 'gameOver') {
+      counter.classList.remove('visible');
+      return;
+    }
+
+    counter.classList.add('visible');
+
+    const playerList = document.getElementById('playerShipsList');
+    const opponentList = document.getElementById('opponentShipsList');
+
+    playerList.innerHTML = this.renderShipList(this.gameState.ships.player);
+    opponentList.innerHTML = this.renderShipList(this.gameState.ships.opponent);
+  }
+
+  renderShipList(ships) {
+    return Object.entries(ships).map(([shipType, ship]) => {
+      // Skip ships that have no positions (not placed or extra ships like ExtraJet)
+      if (ship.positions.length === 0) return '';
+      const config = GAME_CONSTANTS.SHIPS[shipType];
+      const symbol = config ? config.symbol : '✈️';
+      const name = shipType;
+      const status = ship.isSunk ? 'sunk' : 'alive';
+      return `<span class="ship-status ${status}" title="${name}"><span class="ship-emoji">${symbol}</span>${name}</span>`;
+    }).join('');
+  }
+
+  // === Powerup Notification (Online) ===
+  showPowerupNotification(powerupType, isOpponent) {
+    const powerup = GAME_CONSTANTS.POWERUPS[powerupType];
+    if (!powerup) return;
+
+    // Remove existing notification
+    document.querySelectorAll('.powerup-notification').forEach(n => n.remove());
+
+    const notif = document.createElement('div');
+    notif.className = 'powerup-notification';
+    notif.innerHTML = `
+      <span class="notif-icon">${powerup.icon}</span>
+      <span class="notif-text">${isOpponent ? 'Opponent' : 'You'} activated <span class="notif-name">${powerup.name}</span></span>
+    `;
+    document.body.appendChild(notif);
+
+    // Auto-remove after animation
+    setTimeout(() => notif.remove(), 4000);
+  }
+
   createGameBoards() {
     const boards = GAME_CONSTANTS.LAYERS.map(layer => ({ id: layer, name: layer }));
     const playerBoardContainer = document.querySelector('.player-boards .boards-wrapper');
@@ -1305,10 +1548,14 @@ startNewGame(mode) {
     // Clear all AI turn timeouts
     this.aiTurnTimeouts.forEach(timeout => clearTimeout(timeout));
     this.aiTurnTimeouts = [];
-    
+
     // Reset turn processing flag
     this.isProcessingTurn = false;
-    
+
+    // Reset keyboard nav and UI elements
+    this.deactivateKeyboard();
+    document.getElementById('shipCounter').classList.remove('visible');
+
     this.ui.hideMainMenu();
     this.gameState.reset();
     this.ai.reset(); // Reset AI's targeting state
@@ -1406,6 +1653,10 @@ startNewGame(mode) {
       case 'ATTACK_RESULT':
         this.handleAttackResult(data);
         break;
+      case 'POWERUP_USED':
+        // Opponent activated a powerup - show notification
+        this.showPowerupNotification(data.powerup, true);
+        break;
     }
   }
 
@@ -1434,7 +1685,13 @@ startNewGame(mode) {
       
       const isMyTurn = this.gameState.currentTurn === this.gameState.myPlayerId;
       this.ui.updateCommentary(isMyTurn ? "Your Turn! Attack!" : "Opponent's Turn - Wait...");
-      
+
+      // Show ship counter
+      this.updateShipCounter();
+
+      // Deactivate keyboard nav from placement phase
+      this.deactivateKeyboard();
+
       // Clear placement highlights
       document.querySelectorAll('.board-section.placement-active').forEach(section => {
         section.classList.remove('placement-active');
@@ -1681,7 +1938,13 @@ startCombatPhase() {
   
   // Place treasure chests AFTER AI ships are placed
   this.gameState.placeTreasureChests();
-  
+
+  // Show ship counter
+  this.updateShipCounter();
+
+  // Deactivate keyboard nav from placement phase so it resets for combat
+  this.deactivateKeyboard();
+
   this.ui.updateGameInfo('Combat phase - Attack your opponent\'s board!');
 }
 
@@ -3878,9 +4141,12 @@ updateBoard(result) {
   
   // Play animation
   this.game.animations.playAttackAnimation(result);
-  
+
   // Update scoreboard with latest hits/misses
   this.updateScoreBoard();
+
+  // Update ship counter display
+  this.game.updateShipCounter();
 }
 
 showSonarEffect(side, layer, centerIndex) {
@@ -3941,6 +4207,13 @@ showSonarEffect(side, layer, centerIndex) {
 
   renderMainMenu() {
     document.getElementById('gameMenu').style.display = 'flex';
+    document.getElementById('shipCounter').classList.remove('visible');
+    document.getElementById('keyboardHint').classList.remove('visible');
+    // Reset online menu state to main buttons
+    document.getElementById('mainMenuButtons').classList.remove('hidden');
+    document.getElementById('onlineMenuButtons').classList.add('hidden');
+    document.getElementById('joinGameInput').classList.add('hidden');
+    document.getElementById('hostGameDisplay').classList.add('hidden');
   }
   
   hideMainMenu() {
@@ -4259,6 +4532,9 @@ class NetworkManager {
     this.isHost = false;
     this.roomCode = null;
     this.isConnected = false;
+    this.pingInterval = null;
+    this.lastPingTime = null;
+    this.currentPing = null;
   }
 
   generateRoomCode() {
@@ -4270,10 +4546,65 @@ class NetworkManager {
     return code;
   }
 
+  updateConnectionUI(status, text) {
+    const el = document.getElementById('connectionStatus');
+    if (!el) return;
+
+    el.classList.remove('connected', 'connecting', 'disconnected');
+    el.classList.add('visible', status);
+    el.querySelector('.connection-text').textContent = text;
+
+    const pingEl = el.querySelector('.connection-ping');
+    if (this.currentPing !== null && status === 'connected') {
+      pingEl.textContent = `${this.currentPing}ms`;
+    } else {
+      pingEl.textContent = '';
+    }
+  }
+
+  hideConnectionUI() {
+    const el = document.getElementById('connectionStatus');
+    if (el) el.classList.remove('visible');
+  }
+
+  startPingLoop() {
+    this.stopPingLoop();
+    this.pingInterval = setInterval(() => {
+      if (this.conn && this.conn.open) {
+        this.lastPingTime = Date.now();
+        this.conn.send({ type: 'PING', timestamp: this.lastPingTime });
+      }
+    }, 5000);
+  }
+
+  stopPingLoop() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+  }
+
+  handlePing(data) {
+    if (data.type === 'PING') {
+      // Respond to ping
+      this.send({ type: 'PONG', timestamp: data.timestamp });
+      return true;
+    }
+    if (data.type === 'PONG') {
+      // Calculate round-trip time
+      this.currentPing = Date.now() - data.timestamp;
+      this.updateConnectionUI('connected', 'Connected');
+      return true;
+    }
+    return false;
+  }
+
   initialize(customId = null) {
     // Use custom ID if provided (for hosting), otherwise let PeerJS generate one
     const peerId = customId || null;
-    
+
+    this.updateConnectionUI('connecting', 'Connecting...');
+
     this.peer = new Peer(peerId, {
       debug: 2
     });
@@ -4283,6 +4614,7 @@ class NetworkManager {
       console.log('My peer ID is: ' + id);
       if (this.isHost) {
         this.game.ui.showRoomCode(id);
+        this.updateConnectionUI('connecting', 'Waiting for opponent...');
       }
     });
 
@@ -4292,19 +4624,39 @@ class NetworkManager {
 
     this.peer.on('error', (err) => {
       console.error('PeerJS error:', err);
-      alert('Connection error: ' + err.type);
-      this.game.ui.showMainMenu();
+      const errorMessages = {
+        'browser-incompatible': 'Your browser does not support WebRTC.',
+        'disconnected': 'Connection to the server was lost.',
+        'invalid-id': 'The room code is invalid.',
+        'invalid-key': 'API key error. Please try again.',
+        'network': 'Network error. Check your internet connection.',
+        'peer-unavailable': 'Room not found. Check the room code and try again.',
+        'ssl-unavailable': 'Secure connection not available.',
+        'server-error': 'Server error. Please try again later.',
+        'socket-error': 'Connection error. Please try again.',
+        'socket-closed': 'Connection was closed unexpectedly.',
+        'unavailable-id': 'Room code already in use. Try again.',
+        'webrtc': 'WebRTC error. Please try a different browser.'
+      };
+      const message = errorMessages[err.type] || `Connection error: ${err.type}`;
+      this.updateConnectionUI('disconnected', 'Error');
+      this.game.ui.updateCommentary(message);
+      setTimeout(() => {
+        this.hideConnectionUI();
+        this.game.ui.showMainMenu();
+      }, 2000);
     });
   }
 
   connect(remoteId) {
     if (!this.peer) this.initialize();
-    
+
     // Close existing connection if any
     if (this.conn) {
       this.conn.close();
     }
 
+    this.updateConnectionUI('connecting', 'Joining...');
     console.log('Connecting to ' + remoteId);
     const conn = this.peer.connect(remoteId);
     this.handleConnection(conn);
@@ -4312,25 +4664,30 @@ class NetworkManager {
 
   handleConnection(conn) {
     this.conn = conn;
-    
+
     const handleOpen = () => {
       // Prevent double-calling if already connected
       if (this.isConnected) return;
-      
+
       console.log('Connected to: ' + conn.peer);
       this.isConnected = true;
+      this.updateConnectionUI('connected', 'Connected');
+      this.startPingLoop();
       this.game.onPeerConnected(this.isHost);
     };
-    
+
     // Set up the 'open' event handler
     this.conn.on('open', handleOpen);
-    
+
     // Check if the connection is already open (event may have already fired)
     if (this.conn.open) {
       handleOpen();
     }
 
     this.conn.on('data', (data) => {
+      // Handle ping/pong internally
+      if (this.handlePing(data)) return;
+
       console.log('Received data:', data);
       this.game.handlePeerData(data);
     });
@@ -4338,12 +4695,22 @@ class NetworkManager {
     this.conn.on('close', () => {
       console.log('Connection closed');
       this.isConnected = false;
-      alert('Connection lost!');
-      this.game.ui.showMainMenu();
+      this.stopPingLoop();
+      this.updateConnectionUI('disconnected', 'Disconnected');
+
+      // Only show alert/redirect if game is still in progress
+      if (this.game.gameState.phase !== 'gameOver') {
+        this.game.ui.updateCommentary('Opponent disconnected!');
+        setTimeout(() => {
+          this.hideConnectionUI();
+          this.game.ui.showMainMenu();
+        }, 2000);
+      }
     });
-    
+
     this.conn.on('error', (err) => {
       console.error('Connection error:', err);
+      this.updateConnectionUI('disconnected', 'Error');
     });
   }
 
@@ -4352,10 +4719,12 @@ class NetworkManager {
       this.conn.send(data);
     } else {
       console.error('Connection not open, cannot send data');
+      this.updateConnectionUI('disconnected', 'Disconnected');
     }
   }
-  
+
   reset() {
+    this.stopPingLoop();
     if (this.conn) {
       this.conn.close();
     }
@@ -4367,6 +4736,8 @@ class NetworkManager {
     this.isHost = false;
     this.roomCode = null;
     this.isConnected = false;
+    this.currentPing = null;
+    this.hideConnectionUI();
   }
 }
 
@@ -4376,10 +4747,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // Let keyboard navigation handle arrow keys, 1-4, space, enter first
+    if (game.handleKeyboardNav(e)) return;
+
     switch (e.key) {
       case 'r':
       case 'R':
         game.rotateShip();
+        // Update keyboard cursor in case layer changed after rotation
+        if (game.keyboard.active) game.updateKeyboardCursor();
         break;
       case 'z':
       case 'Z':
@@ -4388,6 +4764,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         break;
       case 'Escape':
+        // If keyboard nav is active, deactivate it first
+        if (game.keyboard.active) {
+          game.deactivateKeyboard();
+          return;
+        }
         const menu = document.getElementById('gameMenu');
         menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
         break;

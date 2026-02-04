@@ -1873,3 +1873,246 @@ body {
     width: 32px;
   }
 }
+
+/* === Keyboard Navigation Cursor === */
+.cell.keyboard-cursor {
+  outline: 2px solid var(--warning-color) !important;
+  outline-offset: -2px;
+  box-shadow: 0 0 12px rgba(255, 214, 0, 0.6), inset 0 0 8px rgba(255, 214, 0, 0.15) !important;
+  z-index: 10 !important;
+  position: relative;
+}
+
+.cell.keyboard-cursor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  animation: cursorPulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes cursorPulse {
+  0%, 100% { box-shadow: inset 0 0 4px rgba(255, 214, 0, 0.2); }
+  50% { box-shadow: inset 0 0 10px rgba(255, 214, 0, 0.4); }
+}
+
+/* Active layer indicator during keyboard nav */
+.board-section.keyboard-active-layer .layer-label {
+  color: var(--warning-color) !important;
+  text-shadow: 0 0 8px rgba(255, 214, 0, 0.6);
+}
+
+/* Keyboard hint bar */
+.keyboard-hint {
+  display: none;
+  width: 100%;
+  max-width: 850px;
+  padding: 0.3rem 0.8rem;
+  margin: 0.2rem 0;
+  text-align: center;
+  font-size: 0.65em;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.keyboard-hint.visible {
+  display: block;
+}
+
+.keyboard-hint kbd {
+  display: inline-block;
+  padding: 0.1em 0.4em;
+  font-size: 0.9em;
+  color: var(--text-color);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  margin: 0 0.15em;
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* === Ship Counter Display === */
+.ship-counter {
+  display: none;
+  width: 100%;
+  max-width: 850px;
+  padding: 0.4rem 0.8rem;
+  margin: 0.2rem 0;
+  background: linear-gradient(145deg, var(--background-light), var(--background-dark));
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ship-counter.visible {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.ship-counter-side {
+  flex: 0 1 auto;
+  text-align: center;
+}
+
+.ship-counter-side .counter-label {
+  font-size: 0.7em;
+  color: var(--primary-light);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.ships-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ship-status {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.ship-status.sunk {
+  opacity: 0.4;
+  text-decoration: line-through;
+  border-color: rgba(255, 82, 82, 0.3);
+  background: rgba(255, 82, 82, 0.1);
+}
+
+.ship-status.alive {
+  border-color: rgba(0, 200, 83, 0.3);
+  background: rgba(0, 200, 83, 0.05);
+}
+
+.ship-status .ship-emoji {
+  font-size: 0.9em;
+}
+
+/* === Connection Status Indicator === */
+.connection-status {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.65em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 500;
+  transition: all 0.3s ease;
+}
+
+.connection-status.visible {
+  display: flex;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: background 0.3s ease;
+}
+
+.connection-status.connected .connection-dot {
+  background: var(--success-color);
+  box-shadow: 0 0 6px var(--success-color);
+}
+
+.connection-status.connecting .connection-dot {
+  background: var(--warning-color);
+  animation: connectingPulse 1s infinite;
+}
+
+.connection-status.disconnected .connection-dot {
+  background: var(--accent-color);
+  box-shadow: 0 0 6px var(--accent-color);
+}
+
+@keyframes connectingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.connection-text {
+  color: var(--text-secondary);
+}
+
+.connection-ping {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+/* === Powerup Notification (Online) === */
+.powerup-notification {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, rgba(45, 45, 45, 0.95), rgba(18, 18, 18, 0.95));
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: slideDown 0.4s ease-out, fadeOut 0.4s ease-in 3.6s forwards;
+  font-size: 0.85em;
+}
+
+.powerup-notification .notif-icon {
+  font-size: 1.3em;
+}
+
+.powerup-notification .notif-text {
+  color: var(--text-color);
+}
+
+.powerup-notification .notif-name {
+  color: gold;
+  font-weight: bold;
+}
+
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; pointer-events: none; }
+}
+
+/* Responsive adjustments for new elements */
+@media (max-width: 768px) {
+  .keyboard-hint { display: none !important; }
+  .connection-status { font-size: 0.6em; top: 4px; right: 4px; }
+  .ship-counter.visible { gap: 0.8rem; padding: 0.3rem 0.5rem; }
+  .ships-list { gap: 0.3rem; }
+  .ship-status { font-size: 0.65em; padding: 0.1rem 0.3rem; }
+}
+
+@media (max-width: 480px) {
+  .ship-counter.visible { flex-direction: column; gap: 0.4rem; }
+  .powerup-notification { font-size: 0.75em; padding: 0.4rem 0.8rem; }
+}
