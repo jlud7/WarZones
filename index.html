@@ -87,10 +87,32 @@
     </div>
   </div>
       
+  <!-- Connection Status (Online mode) -->
+  <div id="connectionStatus" class="connection-status">
+    <div class="connection-dot"></div>
+    <span class="connection-text">Offline</span>
+    <span class="connection-ping"></span>
+  </div>
+
   <!-- Commentary Box (permanent) -->
   <div id="commentaryBox" class="commentary-box">
     <p id="commentaryText">Welcome to War Zones!</p>
   </div>
+
+  <!-- Ship Counter Display -->
+  <div id="shipCounter" class="ship-counter">
+    <div class="ship-counter-side" id="playerShipCounter">
+      <div class="counter-label">YOUR FLEET</div>
+      <div class="ships-list" id="playerShipsList"></div>
+    </div>
+    <div class="ship-counter-side" id="opponentShipCounter">
+      <div class="counter-label">ENEMY FLEET</div>
+      <div class="ships-list" id="opponentShipsList"></div>
+    </div>
+  </div>
+
+  <!-- Keyboard Hint Bar -->
+  <div id="keyboardHint" class="keyboard-hint"></div>
   
   <!-- Game Container -->
   <div class="game-container">

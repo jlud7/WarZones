@@ -1873,3 +1873,552 @@ body {
     width: 32px;
   }
 }
+
+/* === Keyboard Navigation Cursor === */
+.cell.keyboard-cursor {
+  outline: 2px solid var(--warning-color) !important;
+  outline-offset: -2px;
+  box-shadow: 0 0 12px rgba(255, 214, 0, 0.6), inset 0 0 8px rgba(255, 214, 0, 0.15) !important;
+  z-index: 10 !important;
+  position: relative;
+}
+
+.cell.keyboard-cursor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  animation: cursorPulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes cursorPulse {
+  0%, 100% { box-shadow: inset 0 0 4px rgba(255, 214, 0, 0.2); }
+  50% { box-shadow: inset 0 0 10px rgba(255, 214, 0, 0.4); }
+}
+
+/* Active layer indicator during keyboard nav */
+.board-section.keyboard-active-layer .layer-label {
+  color: var(--warning-color) !important;
+  text-shadow: 0 0 8px rgba(255, 214, 0, 0.6);
+}
+
+/* Keyboard hint bar */
+.keyboard-hint {
+  display: none;
+  width: 100%;
+  max-width: 850px;
+  padding: 0.3rem 0.8rem;
+  margin: 0.2rem 0;
+  text-align: center;
+  font-size: 0.65em;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.keyboard-hint.visible {
+  display: block;
+}
+
+.keyboard-hint kbd {
+  display: inline-block;
+  padding: 0.1em 0.4em;
+  font-size: 0.9em;
+  color: var(--text-color);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  margin: 0 0.15em;
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* === Ship Counter Display === */
+.ship-counter {
+  display: none;
+  width: 100%;
+  max-width: 850px;
+  padding: 0.4rem 0.8rem;
+  margin: 0.2rem 0;
+  background: linear-gradient(145deg, var(--background-light), var(--background-dark));
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ship-counter.visible {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.ship-counter-side {
+  flex: 0 1 auto;
+  text-align: center;
+}
+
+.ship-counter-side .counter-label {
+  font-size: 0.7em;
+  color: var(--primary-light);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.ships-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ship-status {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.ship-status.sunk {
+  opacity: 0.4;
+  text-decoration: line-through;
+  border-color: rgba(255, 82, 82, 0.3);
+  background: rgba(255, 82, 82, 0.1);
+}
+
+.ship-status.alive {
+  border-color: rgba(0, 200, 83, 0.3);
+  background: rgba(0, 200, 83, 0.05);
+}
+
+.ship-status .ship-emoji {
+  font-size: 0.9em;
+}
+
+/* === Connection Status Indicator === */
+.connection-status {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.65em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 500;
+  transition: all 0.3s ease;
+}
+
+.connection-status.visible {
+  display: flex;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: background 0.3s ease;
+}
+
+.connection-status.connected .connection-dot {
+  background: var(--success-color);
+  box-shadow: 0 0 6px var(--success-color);
+}
+
+.connection-status.connecting .connection-dot {
+  background: var(--warning-color);
+  animation: connectingPulse 1s infinite;
+}
+
+.connection-status.disconnected .connection-dot {
+  background: var(--accent-color);
+  box-shadow: 0 0 6px var(--accent-color);
+}
+
+@keyframes connectingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.connection-text {
+  color: var(--text-secondary);
+}
+
+.connection-ping {
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+/* === Powerup Notification (Online) === */
+.powerup-notification {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, rgba(45, 45, 45, 0.95), rgba(18, 18, 18, 0.95));
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: slideDown 0.4s ease-out, fadeOut 0.4s ease-in 3.6s forwards;
+  font-size: 0.85em;
+}
+
+.powerup-notification .notif-icon {
+  font-size: 1.3em;
+}
+
+.powerup-notification .notif-text {
+  color: var(--text-color);
+}
+
+.powerup-notification .notif-name {
+  color: gold;
+  font-weight: bold;
+}
+
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; pointer-events: none; }
+}
+
+/* === Explosion Effects === */
+.explosion-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  overflow: visible;
+}
+
+.explosion-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.explosion-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 82, 82, 0.8);
+  pointer-events: none;
+  animation: explosionRing 0.6s ease-out forwards;
+}
+
+@keyframes explosionRing {
+  0% { width: 0; height: 0; opacity: 1; transform: translate(-50%, -50%) scale(0); }
+  100% { width: 80px; height: 80px; opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+.explosion-flash {
+  position: absolute;
+  inset: -4px;
+  border-radius: 4px;
+  background: radial-gradient(circle, rgba(255, 200, 50, 0.9), rgba(255, 82, 82, 0.6), transparent 70%);
+  pointer-events: none;
+  animation: explosionFlash 0.35s ease-out forwards;
+}
+
+@keyframes explosionFlash {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(2); }
+}
+
+/* Miss splash effect */
+.miss-splash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  overflow: visible;
+}
+
+.splash-drop {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(106, 183, 255, 0.7);
+  pointer-events: none;
+}
+
+.splash-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  border: 1px solid rgba(106, 183, 255, 0.5);
+  pointer-events: none;
+  animation: splashRing 0.5s ease-out forwards;
+}
+
+@keyframes splashRing {
+  0% { width: 0; height: 0; opacity: 0.8; transform: translate(-50%, -50%) scale(0); }
+  100% { width: 50px; height: 50px; opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* === Screen Shake === */
+.screen-shake {
+  animation: screenShake 0.4s ease-out;
+}
+
+@keyframes screenShake {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-4px, 2px); }
+  20% { transform: translate(4px, -2px); }
+  30% { transform: translate(-3px, -1px); }
+  40% { transform: translate(3px, 1px); }
+  50% { transform: translate(-2px, 2px); }
+  60% { transform: translate(2px, -1px); }
+  70% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  90% { transform: translate(-1px, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+.screen-shake-heavy {
+  animation: screenShakeHeavy 0.5s ease-out;
+}
+
+@keyframes screenShakeHeavy {
+  0% { transform: translate(0, 0) rotate(0); }
+  10% { transform: translate(-6px, 3px) rotate(-0.5deg); }
+  20% { transform: translate(6px, -4px) rotate(0.5deg); }
+  30% { transform: translate(-5px, -2px) rotate(-0.3deg); }
+  40% { transform: translate(4px, 3px) rotate(0.3deg); }
+  50% { transform: translate(-3px, 2px) rotate(-0.2deg); }
+  60% { transform: translate(3px, -2px) rotate(0.2deg); }
+  70% { transform: translate(-2px, 1px) rotate(0); }
+  80% { transform: translate(1px, -1px); }
+  100% { transform: translate(0, 0) rotate(0); }
+}
+
+/* === Sunk Ship Dramatic Effect === */
+.cell.sinking {
+  animation: shipSink 0.8s ease-in forwards;
+}
+
+@keyframes shipSink {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  30% { transform: scale(1.1) rotate(3deg); opacity: 1; }
+  60% { transform: scale(0.9) rotate(-5deg); opacity: 0.7; }
+  100% { transform: scale(0.75) rotate(8deg); opacity: 0.5; filter: brightness(0.4) saturate(0.3); }
+}
+
+.cell.sunk {
+  animation: sunkPulse 2s infinite alternate;
+  transform: scale(0.75) rotate(8deg);
+  opacity: 0.5;
+  filter: brightness(0.4) saturate(0.3);
+}
+
+/* === Victory Confetti Canvas === */
+.confetti-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2001;
+}
+
+/* Victory-specific game over styling */
+.game-over-overlay.victory-overlay {
+  background: rgba(0, 20, 0, 0.5);
+}
+
+.game-over-overlay.victory-overlay .game-over-content {
+  border-color: var(--success-color);
+  box-shadow: 0 0 40px rgba(0, 200, 83, 0.4), 0 0 80px rgba(0, 200, 83, 0.1);
+}
+
+.game-over-overlay.victory-overlay h2 {
+  background: linear-gradient(to right, #ffd700, #ff6b35, #ffd700);
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: victoryTextGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes victoryTextGlow {
+  0% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); filter: brightness(1); }
+  100% { text-shadow: 0 0 25px rgba(255, 215, 0, 0.8), 0 0 50px rgba(255, 107, 53, 0.4); filter: brightness(1.2); }
+}
+
+/* Defeat styling */
+.game-over-overlay.defeat-overlay {
+  background: rgba(20, 0, 0, 0.5);
+}
+
+.game-over-overlay.defeat-overlay .game-over-content {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 40px rgba(255, 82, 82, 0.3);
+}
+
+.game-over-overlay.defeat-overlay h2 {
+  background: linear-gradient(to right, #ff5252, #b71c1c);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* === AI Thinking Indicator === */
+.ai-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ai-thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.ai-thinking-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  animation: thinkingDot 1.2s ease-in-out infinite;
+}
+
+.ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinkingDot {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Scanning overlay on player boards during AI turn */
+.board.ai-scanning::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  animation: aiScanLine 1s ease-in-out infinite;
+  z-index: 15;
+  pointer-events: none;
+}
+
+@keyframes aiScanLine {
+  0% { top: 0; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* === Phase Transition === */
+.phase-transition-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1800;
+  animation: phaseTransitionIn 0.4s ease-out;
+}
+
+.phase-transition-overlay.exit {
+  animation: phaseTransitionOut 0.4s ease-in forwards;
+}
+
+@keyframes phaseTransitionIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes phaseTransitionOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.phase-transition-text {
+  font-size: 2.5rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  background: linear-gradient(to right, var(--primary-light), var(--accent-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: phaseTextPulse 0.8s ease-in-out;
+}
+
+.phase-transition-sub {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  animation: phaseSubFadeIn 0.4s ease-out 0.3s forwards;
+}
+
+@keyframes phaseTextPulse {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes phaseSubFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustments for new effects */
+@media (max-width: 768px) {
+  .phase-transition-text { font-size: 1.8rem; }
+  .phase-transition-sub { font-size: 0.75rem; }
+  .explosion-ring { animation-duration: 0.4s; }
+}
+
+@media (max-width: 480px) {
+  .phase-transition-text { font-size: 1.4rem; }
+}
+
+/* Responsive adjustments for new elements */
+@media (max-width: 768px) {
+  .keyboard-hint { display: none !important; }
+  .connection-status { font-size: 0.6em; top: 4px; right: 4px; }
+  .ship-counter.visible { gap: 0.8rem; padding: 0.3rem 0.5rem; }
+  .ships-list { gap: 0.3rem; }
+  .ship-status { font-size: 0.65em; padding: 0.1rem 0.3rem; }
+}
+
+@media (max-width: 480px) {
+  .ship-counter.visible { flex-direction: column; gap: 0.4rem; }
+  .powerup-notification { font-size: 0.75em; padding: 0.4rem 0.8rem; }
+}
