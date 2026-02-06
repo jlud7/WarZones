@@ -3265,6 +3265,7 @@ body {
 }
 
 .turn-timer.hidden { display: none; }
+.turn-timer.paused .turn-timer-bar { background: rgba(255,255,255,0.05); transition: none; }
 
 .turn-timer-bar {
   height: 100%;

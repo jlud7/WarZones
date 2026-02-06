@@ -658,6 +658,9 @@ handleAIPowerupSelection() {
     }
   });
 
+  // Check if BlackBox is viable (need empty unattacked sky cells on AI's board)
+  const canUseBlackBox = this.gameState.boards.opponent.Sky.some(cell => cell === null);
+
   // AI strategy:
   // If many undiscovered ships - prioritize CannonBall (intel gathering)
   // If few ships but many positions left - prioritize KryptonLaser (attack)
@@ -671,13 +674,17 @@ handleAIPowerupSelection() {
     } else if (totalPositions >= 5) {
       // Many positions to hit - use laser
       selectedPowerup = 'KryptonLaser';
-    } else {
+    } else if (canUseBlackBox) {
       // Few positions - reinforce
       selectedPowerup = 'BlackBox';
+    } else {
+      // BlackBox not viable, fall back to attack
+      selectedPowerup = 'KryptonLaser';
     }
   } else {
-    // 30% chance to choose randomly
-    selectedPowerup = powerups[Math.floor(Math.random() * powerups.length)];
+    // 30% chance to choose randomly from viable powerups
+    const viable = canUseBlackBox ? powerups : powerups.filter(p => p !== 'BlackBox');
+    selectedPowerup = viable[Math.floor(Math.random() * viable.length)];
   }
 
   // Visual feedback about AI's choice
@@ -5839,7 +5846,7 @@ class CampaignManager {
       clearInterval(this.modifierState.timerInterval);
       this.modifierState.timerInterval = null;
     }
-    this._hideTimerUI();
+    this._pauseTimerUI();
   }
 
   _timerExpired() {
@@ -5864,6 +5871,16 @@ class CampaignManager {
       if (commentary) commentary.after(timerEl);
     }
     timerEl.classList.remove('hidden');
+  }
+
+  _pauseTimerUI() {
+    const timerEl = document.getElementById('turnTimer');
+    if (!timerEl) return;
+    timerEl.className = 'turn-timer paused';
+    const bar = timerEl.querySelector('.turn-timer-bar');
+    const text = timerEl.querySelector('.turn-timer-text');
+    if (bar) bar.style.width = '0%';
+    if (text) text.textContent = '';
   }
 
   _hideTimerUI() {
@@ -5923,6 +5940,9 @@ class CampaignManager {
 
   // ========== Campaign Game Over (Debriefing) ==========
   showDebriefing(result) {
+    this.stopTurnTimer();
+    this._hideTimerUI();
+
     const isVictory = result.winner === 'player';
     const mission = this.activeMission;
     if (!mission) return;
