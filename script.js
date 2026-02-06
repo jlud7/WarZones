@@ -2140,13 +2140,13 @@ _initCombat() {
         if (check.reason === 'shield') {
           this.campaign.handleShieldBlock(cell, check.shipType);
           this.campaign.onPlayerTurnEnd();
-          this.handleAITurn();
+          setTimeout(() => this.handleAITurn(), 1500);
           return;
         }
         if (check.reason === 'mine') {
           this.campaign.handleMineHit(cell, check.index, check.layer);
           this.campaign.onPlayerTurnEnd();
-          this.handleAITurn();
+          setTimeout(() => this.handleAITurn(), 2000);
           return;
         }
       }
