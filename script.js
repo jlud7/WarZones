@@ -5264,11 +5264,11 @@ class CampaignManager {
         id: 4, act: 2, actName: "STORM FRONT",
         name: "Rapid Response",
         subtitle: "Speed is survival",
-        briefing: "Enemy forces are executing rapid tactical maneuvers. Command has authorized emergency engagement protocols — you have 10 seconds per attack. Hesitation means defeat. Trust your instincts, Commander.",
+        briefing: "Enemy forces are executing rapid tactical maneuvers. Command has authorized emergency engagement protocols — you have 5 seconds per attack. Hesitation means defeat. Trust your instincts, Commander.",
         difficulty: "Soldier",
         isBoss: false,
         modifiers: ['turn_timer'],
-        turnTimerSeconds: 10,
+        turnTimerSeconds: 5,
         aiConfig: { unpredictability: 0.25, clusterPreference: false },
         starThresholds: { three: 60, two: 40 }
       },
