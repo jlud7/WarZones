@@ -3,6 +3,9 @@ name: Generate Enemy Portraits
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
