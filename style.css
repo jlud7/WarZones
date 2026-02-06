@@ -2706,3 +2706,643 @@ body {
   .ship-counter.visible { flex-direction: column; gap: 0.4rem; }
   .powerup-notification { font-size: 0.75em; padding: 0.4rem 0.8rem; }
 }
+
+/* ===========================
+   CAMPAIGN MODE STYLES
+   =========================== */
+
+/* Campaign Menu Button */
+.campaign-menu-btn {
+  background: linear-gradient(145deg, #ff8f00, #e65100) !important;
+  border: 1px solid #ffab00 !important;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
+}
+.campaign-menu-btn::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+  animation: campaignShimmer 3s infinite;
+}
+@keyframes campaignShimmer {
+  0% { transform: translateX(-100%) rotate(25deg); }
+  100% { transform: translateX(100%) rotate(25deg); }
+}
+
+/* Campaign Overlay */
+.campaign-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease;
+}
+
+.campaign-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 90%;
+  max-width: 520px;
+  max-height: 90vh;
+  padding: 1.5rem;
+  background: linear-gradient(145deg, #1a1a2e, #0a0a15);
+  border-radius: 12px;
+  border: 1px solid #ff8f00;
+  box-shadow: 0 0 30px rgba(255, 143, 0, 0.2), inset 0 0 30px rgba(0,0,0,0.5);
+}
+
+.campaign-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.campaign-title {
+  font-size: 1.8rem;
+  background: linear-gradient(to right, #ffab00, #ff6d00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.15em;
+  text-shadow: none;
+}
+
+.campaign-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-top: 0.25rem;
+}
+
+.campaign-star-total {
+  color: #ffd600;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+/* Campaign Map */
+.campaign-map-scroll {
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+  padding: 0.5rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: #ff8f00 #1a1a2e;
+}
+
+.campaign-map-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.campaign-map-scroll::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+.campaign-map-scroll::-webkit-scrollbar-thumb {
+  background: #ff8f00;
+  border-radius: 2px;
+}
+
+.campaign-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0.5rem;
+}
+
+/* Act Headers */
+.campaign-act-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+.act-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, #ff8f00, transparent);
+}
+
+.act-name {
+  color: #ffab00;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+}
+
+/* Mission Nodes */
+.campaign-mission-node {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  background: linear-gradient(145deg, rgba(30,30,50,0.8), rgba(20,20,35,0.9));
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.campaign-mission-node:not(.locked):hover {
+  border-color: var(--primary-light);
+  background: linear-gradient(145deg, rgba(40,40,70,0.9), rgba(30,30,55,0.9));
+  transform: translateX(4px);
+  box-shadow: 0 0 15px rgba(30, 136, 229, 0.2);
+}
+
+.campaign-mission-node.locked {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.campaign-mission-node.completed {
+  border-color: rgba(0, 200, 83, 0.3);
+}
+
+/* Boss Nodes */
+.campaign-mission-node.node-mini-boss {
+  border-color: rgba(255, 82, 82, 0.5);
+  background: linear-gradient(145deg, rgba(60,20,20,0.8), rgba(30,10,10,0.9));
+}
+.campaign-mission-node.node-mini-boss:not(.locked):hover {
+  border-color: #ff5252;
+  box-shadow: 0 0 20px rgba(255, 82, 82, 0.3);
+}
+
+.campaign-mission-node.node-final-boss {
+  border-color: rgba(255, 215, 0, 0.5);
+  background: linear-gradient(145deg, rgba(60,40,0,0.8), rgba(30,20,0,0.9));
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
+}
+.campaign-mission-node.node-final-boss:not(.locked):hover {
+  border-color: #ffd700;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.3);
+}
+
+.mission-node-number {
+  min-width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.node-mini-boss .mission-node-number {
+  background: rgba(255, 82, 82, 0.3);
+  color: #ff5252;
+}
+.node-final-boss .mission-node-number {
+  background: rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+  font-size: 1.1rem;
+}
+
+.mission-node-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mission-node-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mission-node-subtitle {
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.mission-node-difficulty {
+  font-size: 0.5rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: 0.15rem;
+}
+
+/* Difficulty Colors */
+.difficulty-recruit { color: #4caf50; }
+.difficulty-soldier { color: #2196f3; }
+.difficulty-veteran { color: #ff9800; }
+.difficulty-dangerous { color: #ff5252; }
+.difficulty-elite { color: #e040fb; }
+.difficulty-legendary { color: #ffd700; text-shadow: 0 0 6px rgba(255,215,0,0.5); }
+
+.mission-node-stars {
+  display: flex;
+  gap: 0.1rem;
+  font-size: 1rem;
+}
+
+.star.earned { color: #ffd600; }
+.star.empty { color: rgba(255,255,255,0.2); }
+.lock-icon { font-size: 1rem; }
+
+/* Path Connectors */
+.campaign-path-connector {
+  width: 2px;
+  height: 12px;
+  background: linear-gradient(to bottom, var(--primary-color), var(--primary-light));
+  margin: 0;
+}
+.campaign-path-connector.locked {
+  background: rgba(255,255,255,0.1);
+}
+
+/* Campaign Buttons */
+.campaign-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.campaign-reset-btn {
+  background: linear-gradient(145deg, #424242, #212121) !important;
+  font-size: 0.7rem !important;
+  padding: 8px 12px !important;
+}
+
+/* ===== Briefing Overlay ===== */
+.briefing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease;
+}
+
+.briefing-content {
+  width: 90%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  background: linear-gradient(145deg, #1a1a2e, #0a0a15);
+  border-radius: 12px;
+  border: 1px solid var(--primary-color);
+  box-shadow: 0 0 30px rgba(30, 136, 229, 0.2);
+  text-align: center;
+}
+
+.briefing-content.briefing-mini-boss {
+  border-color: #ff5252;
+  box-shadow: 0 0 40px rgba(255, 82, 82, 0.3);
+}
+
+.briefing-content.briefing-final-boss {
+  border-color: #ffd700;
+  box-shadow: 0 0 50px rgba(255, 215, 0, 0.3);
+}
+
+.briefing-boss-tag {
+  display: inline-block;
+  padding: 0.2rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+}
+
+.briefing-mini-boss .briefing-boss-tag {
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+  border: 1px solid rgba(255, 82, 82, 0.5);
+}
+
+.briefing-final-boss .briefing-boss-tag {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  animation: bossTagPulse 2s infinite;
+}
+
+@keyframes bossTagPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 215, 0, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
+}
+
+.briefing-act {
+  font-size: 0.6rem;
+  color: #ffab00;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.3rem;
+}
+
+.briefing-title {
+  font-size: 1.3rem;
+  color: var(--text-color);
+  margin-bottom: 0.25rem;
+}
+
+.briefing-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.briefing-difficulty {
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.briefing-text {
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  text-align: left;
+  padding: 0.75rem;
+  background: rgba(0,0,0,0.3);
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-color);
+  margin-bottom: 1rem;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.briefing-mini-boss .briefing-text { border-left-color: #ff5252; }
+.briefing-final-boss .briefing-text { border-left-color: #ffd700; }
+
+.briefing-modifiers {
+  margin-bottom: 1rem;
+}
+
+.modifiers-label {
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.2em;
+  margin-bottom: 0.4rem;
+}
+
+.modifiers-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.modifier-tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+}
+
+.briefing-best {
+  margin-bottom: 1rem;
+}
+
+.best-score {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.best-score .star.earned { font-size: 0.9rem; }
+
+.briefing-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.deploy-btn {
+  background: linear-gradient(145deg, #ff8f00, #e65100) !important;
+  border: 1px solid #ffab00 !important;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  min-width: 120px;
+}
+
+/* ===== Campaign Debriefing ===== */
+.campaign-debrief-content {
+  text-align: center;
+}
+
+.debrief-header h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.debrief-mission-name {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.debrief-stars {
+  margin: 1rem 0;
+}
+
+.star-display {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.debrief-star {
+  font-size: 2.5rem;
+  opacity: 0;
+  transform: scale(0);
+  animation: starReveal 0.5s ease forwards;
+}
+
+.debrief-star.earned {
+  color: #ffd600;
+  text-shadow: 0 0 15px rgba(255, 214, 0, 0.6);
+}
+
+.debrief-star:not(.earned) {
+  color: rgba(255,255,255,0.15);
+}
+
+@keyframes starReveal {
+  0% { opacity: 0; transform: scale(0) rotate(-30deg); }
+  60% { transform: scale(1.3) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+.star-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  margin-top: 0.5rem;
+  color: #ffab00;
+}
+
+.debrief-defeat-msg {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 1rem 0;
+  padding: 0.5rem;
+}
+
+.final-victory-text {
+  font-size: 1.8rem;
+  background: linear-gradient(to right, #ffd700, #ff6d00, #ffd700);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+  animation: finalVictoryGlow 2s infinite;
+}
+
+@keyframes finalVictoryGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+.final-victory-msg {
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: #ffd700;
+  padding: 0.75rem;
+  margin: 0.75rem 0;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  border-radius: 6px;
+}
+
+.campaign-next-btn {
+  background: linear-gradient(145deg, #ff8f00, #e65100) !important;
+  font-weight: 700;
+}
+
+.debrief-mini-boss .debrief-header h2 { color: #ff5252; }
+.debrief-final-boss .debrief-header h2 { color: #ffd700; }
+
+/* ===== Turn Timer ===== */
+.turn-timer {
+  width: 80%;
+  max-width: 500px;
+  margin: 0.3rem auto;
+  height: 20px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.turn-timer.hidden { display: none; }
+
+.turn-timer-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+  border-radius: 10px;
+  transition: width 1s linear;
+}
+
+.turn-timer.warning .turn-timer-bar {
+  background: linear-gradient(90deg, #ff9800, #ffb74d);
+}
+
+.turn-timer.critical .turn-timer-bar {
+  background: linear-gradient(90deg, #ff1744, #ff5252);
+  animation: timerPulse 0.5s infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.turn-timer-text {
+  position: absolute;
+  right: 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* ===== Campaign Modifier Visual Effects ===== */
+
+/* Shield Deflection */
+.shield-deflect {
+  animation: shieldDeflect 1.2s ease !important;
+  z-index: 10;
+}
+
+@keyframes shieldDeflect {
+  0% { background: rgba(100, 181, 246, 0.8); transform: scale(1); box-shadow: 0 0 20px rgba(100, 181, 246, 0.8); }
+  25% { background: rgba(100, 181, 246, 1); transform: scale(1.3); box-shadow: 0 0 30px rgba(100, 181, 246, 1); }
+  50% { background: rgba(100, 181, 246, 0.6); transform: scale(1.1); }
+  100% { background: transparent; transform: scale(1); box-shadow: none; }
+}
+
+/* Mine Explosion */
+.mine-exploded {
+  animation: mineExplode 0.8s ease !important;
+}
+
+@keyframes mineExplode {
+  0% { background: #ff1744; transform: scale(1); }
+  20% { background: #ff6d00; transform: scale(1.5); box-shadow: 0 0 30px rgba(255, 109, 0, 0.8); }
+  40% { background: #ffd600; transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Fogged Cell (miss faded) */
+.cell.fogged {
+  background: rgba(255,255,255,0.03) !important;
+  border-color: rgba(255,255,255,0.05) !important;
+}
+
+/* Decayed Hit (hit faded) */
+.cell.decayed {
+  background: rgba(255, 82, 82, 0.1) !important;
+  color: rgba(255,255,255,0.2) !important;
+  font-size: 0.7rem;
+  border-color: rgba(255, 82, 82, 0.15) !important;
+}
+
+/* ===== Campaign Responsive ===== */
+@media (max-width: 480px) {
+  .campaign-content { padding: 1rem; max-width: 95%; }
+  .campaign-title { font-size: 1.4rem; }
+  .briefing-content { padding: 1rem; }
+  .briefing-title { font-size: 1.1rem; }
+  .briefing-text { font-size: 0.65rem; }
+  .debrief-star { font-size: 2rem; }
+}
