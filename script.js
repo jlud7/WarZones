@@ -658,6 +658,9 @@ handleAIPowerupSelection() {
     }
   });
 
+  // Check if BlackBox is viable (need empty unattacked sky cells on AI's board)
+  const canUseBlackBox = this.gameState.boards.opponent.Sky.some(cell => cell === null);
+
   // AI strategy:
   // If many undiscovered ships - prioritize CannonBall (intel gathering)
   // If few ships but many positions left - prioritize KryptonLaser (attack)
@@ -671,13 +674,17 @@ handleAIPowerupSelection() {
     } else if (totalPositions >= 5) {
       // Many positions to hit - use laser
       selectedPowerup = 'KryptonLaser';
-    } else {
+    } else if (canUseBlackBox) {
       // Few positions - reinforce
       selectedPowerup = 'BlackBox';
+    } else {
+      // BlackBox not viable, fall back to attack
+      selectedPowerup = 'KryptonLaser';
     }
   } else {
-    // 30% chance to choose randomly
-    selectedPowerup = powerups[Math.floor(Math.random() * powerups.length)];
+    // 30% chance to choose randomly from viable powerups
+    const viable = canUseBlackBox ? powerups : powerups.filter(p => p !== 'BlackBox');
+    selectedPowerup = viable[Math.floor(Math.random() * viable.length)];
   }
 
   // Visual feedback about AI's choice
@@ -5228,6 +5235,8 @@ class CampaignManager {
         id: 1, act: 1, actName: "RISING TIDE",
         name: "First Contact",
         subtitle: "Begin your command",
+        enemyName: "Lt. Mercer",
+        portrait: "assets/portraits/enemy-1.webp",
         briefing: "Commander, welcome to the fleet. Intel reports a small enemy patrol in the sector. Engage and destroy all enemy vessels. This is your proving ground — show us what you're made of.",
         difficulty: "Recruit",
         isBoss: false,
@@ -5239,6 +5248,8 @@ class CampaignManager {
         id: 2, act: 1, actName: "RISING TIDE",
         name: "Fog Bank",
         subtitle: "Trust your instruments",
+        enemyName: "Cmdr. Haze",
+        portrait: "assets/portraits/enemy-2.webp",
         briefing: "A dense electromagnetic fog has rolled across the combat zone. Your targeting sensors are degrading — missed shots will fade from your display after 2 turns. Mark your targets carefully, Commander. Memory is your greatest weapon.",
         difficulty: "Recruit",
         isBoss: false,
@@ -5251,6 +5262,8 @@ class CampaignManager {
         id: 3, act: 1, actName: "RISING TIDE",
         name: "The Hydra",
         subtitle: "Cut one head, two more appear",
+        enemyName: "The Hydra",
+        portrait: "assets/portraits/enemy-3.webp",
         briefing: "PRIORITY ALERT: You are engaging Commander Hydra's reinforced battle group. Intelligence confirms an additional Destroyer has joined their fleet — that's 6 ships, not 5. The Hydra earned their name by always having more forces than expected. Strike fast, strike true.",
         difficulty: "Dangerous",
         isBoss: true,
@@ -5264,6 +5277,8 @@ class CampaignManager {
         id: 4, act: 2, actName: "STORM FRONT",
         name: "Rapid Response",
         subtitle: "Speed is survival",
+        enemyName: "Capt. Volt",
+        portrait: "assets/portraits/enemy-4.webp",
         briefing: "Enemy forces are executing rapid tactical maneuvers. Command has authorized emergency engagement protocols — you have 5 seconds per attack. Hesitation means defeat. Trust your instincts, Commander.",
         difficulty: "Soldier",
         isBoss: false,
@@ -5276,6 +5291,8 @@ class CampaignManager {
         id: 5, act: 2, actName: "STORM FRONT",
         name: "Dark Waters",
         subtitle: "Blind in the deep",
+        enemyName: "Capt. Abyssal",
+        portrait: "assets/portraits/enemy-5.webp",
         briefing: "Enemy submarines have deployed deep-sea signal jammers. Your sonar returns in the underwater layer are unreliable — missed pings will vanish from your display. The enemy commander knows these dark waters well. Proceed with extreme caution.",
         difficulty: "Veteran",
         isBoss: false,
@@ -5289,6 +5306,8 @@ class CampaignManager {
         id: 6, act: 2, actName: "STORM FRONT",
         name: "Minefield",
         subtitle: "Every click could be your last",
+        enemyName: "Sgt. Cinder",
+        portrait: "assets/portraits/enemy-6.webp",
         briefing: "WARNING: Naval mines have been detected in the enemy's waters. 3 concealed mines are hidden among their sea grid. Strike a mine and the blast will stun your fleet, giving the enemy a free attack. Choose your targets wisely — or pay the price.",
         difficulty: "Veteran",
         isBoss: false,
@@ -5301,6 +5320,8 @@ class CampaignManager {
         id: 7, act: 2, actName: "STORM FRONT",
         name: "The Kraken",
         subtitle: "Fight the impossible",
+        enemyName: "The Kraken",
+        portrait: "assets/portraits/enemy-7.webp",
         briefing: "CRITICAL ALERT: Your submarine was destroyed in a pre-battle ambush — you fight with only 4 ships. Worse, enemy Commander Kraken has equipped all vessels with experimental deflector shields. The first strike on each enemy ship will be absorbed. You are outgunned and outmatched. The brass says this mission is suicide. Prove them wrong.",
         difficulty: "Dangerous",
         isBoss: true,
@@ -5314,6 +5335,8 @@ class CampaignManager {
         id: 8, act: 3, actName: "OPERATION TRIDENT",
         name: "Phantom Fleet",
         subtitle: "Now you see them...",
+        enemyName: "Cmdr. Specter",
+        portrait: "assets/portraits/enemy-8.webp",
         briefing: "The enemy has deployed advanced stealth plating. Your confirmed hits will degrade and fade from your tactical display after 3 turns. You must track your strikes mentally — your instruments cannot be trusted. Discipline and memory are your only allies.",
         difficulty: "Elite",
         isBoss: false,
@@ -5326,6 +5349,8 @@ class CampaignManager {
         id: 9, act: 3, actName: "OPERATION TRIDENT",
         name: "Iron Curtain",
         subtitle: "Break through their armor",
+        enemyName: "Gen. Bastion",
+        portrait: "assets/portraits/enemy-9.webp",
         briefing: "The enemy's elite guard fleet is equipped with full deflector shield arrays. Every ship in their fleet can absorb one direct hit before taking damage. Your weapons are effective, but you must break through their shields first. Persistence is victory, Commander.",
         difficulty: "Elite",
         isBoss: false,
@@ -5337,6 +5362,8 @@ class CampaignManager {
         id: 10, act: 3, actName: "OPERATION TRIDENT",
         name: "The Admiral",
         subtitle: "End this war",
+        enemyName: "Admiral Voss",
+        portrait: "assets/portraits/enemy-10.webp",
         briefing: "This is it, Commander. Admiral Voss — the architect of this war — commands the most formidable fleet ever assembled. Reinforced with an extra Destroyer. Every ship shielded. Stealth technology rendering your hit data unstable. Sensor fog obscuring your misses. This is the battle that decides everything. There will be no retreat. No reinforcements. Only victory or oblivion. Make every shot count. The world is watching.",
         difficulty: "Legendary",
         isBoss: true,
@@ -5412,12 +5439,17 @@ class CampaignManager {
       const lockedClass = !unlocked ? 'locked' : '';
       const completedClass = completed ? 'completed' : '';
 
+      const portraitEl = mission.portrait
+        ? `<img class="mission-node-portrait" src="${mission.portrait}" alt="${mission.enemyName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : '';
+      const fallbackIcon = mission.isBoss ? (mission.bossTitle === 'FINAL BOSS' ? '☠' : '⚔') : mission.id;
+
       mapHTML += `
         <div class="campaign-mission-node ${bossClass} ${lockedClass} ${completedClass}" data-mission-id="${mission.id}">
-          <div class="mission-node-number">${mission.isBoss ? (mission.bossTitle === 'FINAL BOSS' ? '☠' : '⚔') : mission.id}</div>
+          ${portraitEl}<div class="mission-node-number" ${mission.portrait ? 'style="display:none"' : ''}>${fallbackIcon}</div>
           <div class="mission-node-info">
             <div class="mission-node-name">${mission.isBoss ? mission.bossTitle + ': ' : ''}${mission.name}</div>
-            <div class="mission-node-subtitle">${mission.subtitle}</div>
+            <div class="mission-node-subtitle">${mission.enemyName || mission.subtitle}</div>
             <div class="mission-node-difficulty difficulty-${mission.difficulty.toLowerCase()}">${mission.difficulty}</div>
           </div>
           <div class="mission-node-stars">
@@ -5508,10 +5540,15 @@ class CampaignManager {
     const overlay = document.createElement('div');
     overlay.className = 'briefing-overlay';
     overlay.id = 'briefingOverlay';
+    const portraitHTML = mission.portrait
+      ? `<div class="briefing-portrait-wrap"><img class="briefing-portrait" src="${mission.portrait}" alt="${mission.enemyName}"><div class="briefing-enemy-name">${mission.enemyName}</div></div>`
+      : '';
+
     overlay.innerHTML = `
       <div class="briefing-content ${bossClass}">
         <div class="briefing-header">
           ${mission.isBoss ? `<div class="briefing-boss-tag">${mission.bossTitle}</div>` : ''}
+          ${portraitHTML}
           <div class="briefing-act">ACT ${mission.act}: ${mission.actName}</div>
           <h2 class="briefing-title">Mission ${mission.id}: ${mission.name}</h2>
           <div class="briefing-subtitle">${mission.subtitle}</div>
@@ -5580,8 +5617,13 @@ class CampaignManager {
       this.modifierState.skippedShips = mission.removedShips || [];
     }
 
-    document.getElementById('player2Name').textContent = mission.isBoss ? mission.name : "Enemy";
-    document.getElementById('player2Icon').textContent = mission.isBoss ? '☠️' : '🤖';
+    document.getElementById('player2Name').textContent = mission.enemyName || (mission.isBoss ? mission.name : "Enemy");
+    const iconEl = document.getElementById('player2Icon');
+    if (mission.portrait) {
+      iconEl.innerHTML = `<img class="combat-portrait" src="${mission.portrait}" alt="${mission.enemyName}" onerror="this.replaceWith(document.createTextNode('${mission.isBoss ? '☠️' : '🤖'}'))">`;
+    } else {
+      iconEl.textContent = mission.isBoss ? '☠️' : '🤖';
+    }
     this.game.gameState.gameMode = 'ai';
     this.game.sound.initialize();
     this.game.startNewGame('ai');
@@ -5839,7 +5881,7 @@ class CampaignManager {
       clearInterval(this.modifierState.timerInterval);
       this.modifierState.timerInterval = null;
     }
-    this._hideTimerUI();
+    this._pauseTimerUI();
   }
 
   _timerExpired() {
@@ -5864,6 +5906,16 @@ class CampaignManager {
       if (commentary) commentary.after(timerEl);
     }
     timerEl.classList.remove('hidden');
+  }
+
+  _pauseTimerUI() {
+    const timerEl = document.getElementById('turnTimer');
+    if (!timerEl) return;
+    timerEl.className = 'turn-timer paused';
+    const bar = timerEl.querySelector('.turn-timer-bar');
+    const text = timerEl.querySelector('.turn-timer-text');
+    if (bar) bar.style.width = '0%';
+    if (text) text.textContent = '';
   }
 
   _hideTimerUI() {
@@ -5923,6 +5975,9 @@ class CampaignManager {
 
   // ========== Campaign Game Over (Debriefing) ==========
   showDebriefing(result) {
+    this.stopTurnTimer();
+    this._hideTimerUI();
+
     const isVictory = result.winner === 'player';
     const mission = this.activeMission;
     if (!mission) return;
@@ -5947,12 +6002,17 @@ class CampaignManager {
     overlay.className = `game-over-overlay campaign-debrief ${isVictory ? 'victory-overlay' : 'defeat-overlay'} ${bossClass}`;
     overlay.id = 'gameOverOverlay';
 
+    const debriefPortrait = mission.portrait
+      ? `<img class="debrief-portrait ${isVictory ? 'defeated' : ''}" src="${mission.portrait}" alt="${mission.enemyName}">`
+      : '';
+
     overlay.innerHTML = `
       <div class="game-over-content campaign-debrief-content">
         <div class="debrief-header">
           ${isFinalBossVictory ? '<div class="final-victory-text">THE WAR IS OVER</div>' : ''}
+          ${debriefPortrait}
           <h2>${isVictory ? (mission.isBoss ? 'BOSS DEFEATED' : 'MISSION COMPLETE') : 'MISSION FAILED'}</h2>
-          <div class="debrief-mission-name">${mission.isBoss ? mission.bossTitle + ': ' : ''}${mission.name}</div>
+          <div class="debrief-mission-name">${mission.enemyName || mission.name}</div>
         </div>
         ${isVictory ? `
           <div class="debrief-stars">
