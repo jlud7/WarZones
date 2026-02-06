@@ -3324,11 +3324,9 @@ body {
   100% { transform: scale(1); }
 }
 
-/* Fogged Cell (miss faded) */
-.cell.fogged {
-  background: rgba(255,255,255,0.03) !important;
-  border-color: rgba(255,255,255,0.05) !important;
-}
+/* Fogged Cell - intentionally no visual overrides so fogged cells look
+   identical to unattacked cells, forcing memory-based play */
+.cell.fogged {}
 
 /* Decayed Hit (hit faded) */
 .cell.decayed {
