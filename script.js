@@ -53,6 +53,7 @@ class WarZones {
     this.ai = new GameAI(this); // Pass 'this' to GameAI constructor
     this.stats = new Statistics();
     this.tutorial = new Tutorial();
+    this.campaign = new CampaignManager(this);
     this.network = new NetworkManager(this);
     this.playerWins = 0;
     this.aiWins = 0;
@@ -1191,7 +1192,7 @@ aiUseCannonBall() {
       // Skip ships that have no positions (not placed or extra ships like ExtraJet)
       if (ship.positions.length === 0) return '';
       const config = GAME_CONSTANTS.SHIPS[shipType];
-      const symbol = config ? config.symbol : '✈️';
+      const symbol = config ? config.symbol : (shipType === 'Destroyer' ? '🛥️' : '✈️');
       const name = shipType;
       const status = ship.isSunk ? 'sunk' : 'alive';
       return `<span class="ship-status ${status}" title="${name}"><span class="ship-emoji">${symbol}</span>${name}</span>`;
@@ -1334,6 +1335,11 @@ aiUseCannonBall() {
   }
 
   setupEventListeners() {
+    document.getElementById('playCampaign').addEventListener('click', () => {
+      this.sound.initialize();
+      this.campaign.showCampaignMap();
+    });
+
     document.getElementById('playVsAI').addEventListener('click', () => {
       this.sound.initialize();
       this.gameState.gameMode = 'ai';
@@ -1585,6 +1591,14 @@ startNewGame(mode) {
     this.ui.hideMainMenu();
     this.gameState.reset();
     this.ai.reset(); // Reset AI's targeting state
+
+    // Clean up campaign turn timer if active
+    if (this.campaign?.modifierState?.timerInterval) {
+      this.campaign.stopTurnTimer();
+    }
+    // Remove turn timer element
+    const turnTimerEl = document.getElementById('turnTimer');
+    if (turnTimerEl) turnTimerEl.classList.add('hidden');
     
     // Reset UI state
     document.querySelector('.player-boards').classList.add('active');
@@ -1862,6 +1876,21 @@ startNewGame(mode) {
       }
       this.ui.updateFleetDock();
 
+      // Campaign: skip ships removed by mission modifiers
+      if (this.campaign?.activeMission) {
+        while (this.campaign.shouldSkipShip(this.gameState.getCurrentShip()) && !this.gameState.isPlacementComplete()) {
+          this.gameState.currentShipIndex++;
+        }
+        const campaignNextShip = this.gameState.getCurrentShip();
+        if (campaignNextShip && GAME_CONSTANTS.SHIPS[campaignNextShip]) {
+          const cnConfig = GAME_CONSTANTS.SHIPS[campaignNextShip];
+          const cnSize = cnConfig.size === 1 ? '1 cell' : `${cnConfig.size} cells`;
+          this.ui.updateCommentary(`Place your ${campaignNextShip} (${cnSize}) on the ${cnConfig.layer} board`);
+          this.ui.highlightPlacementBoard();
+          this.ui.updateFleetDock();
+        }
+      }
+
       if (this.gameState.isPlacementComplete()) {
         // Hide undo button and fleet dock
         document.getElementById('undoMove').style.display = 'none';
@@ -1960,6 +1989,11 @@ _initCombat() {
     this.gameState.boards.opponent = this.gameState.createEmptyBoards();
     this.placeAIShips();
 
+    // Campaign: apply modifiers after AI ships placed
+    if (this.campaign?.activeMission) {
+      this.campaign.onCombatStart();
+    }
+
     // Force CSS animations to restart on opponent boards after showing
     setTimeout(() => {
       document.querySelectorAll('.opponent-boards .board').forEach(board => {
@@ -1988,6 +2022,11 @@ _initCombat() {
   this.deactivateKeyboard();
 
   this.ui.updateGameInfo('Combat phase - Attack your opponent\'s board!');
+
+  // Campaign: start turn timer for player's first turn
+  if (this.campaign?.activeMission) {
+    this.campaign.onPlayerTurnStart();
+  }
 }
 
   placeAIShips() {
@@ -2081,8 +2120,28 @@ _initCombat() {
     const index = parseInt(cell.dataset.index);
     const layer = cell.dataset.layer;
     
-    // Don't allow attacking cells already hit/missed
+    // Don't allow attacking cells already hit/missed (but allow decayed/fogged cells to be visually stale)
     if (cell.classList.contains('hit') || cell.classList.contains('miss')) return;
+
+    // Campaign modifier checks before processing the attack
+    if (this.campaign?.activeMission && boardId.includes('opponent')) {
+      const check = this.campaign.beforePlayerAttack(index, layer);
+      if (check.blocked) {
+        this.isProcessingTurn = true;
+        if (check.reason === 'shield') {
+          this.campaign.handleShieldBlock(cell, check.shipType);
+          this.campaign.onPlayerTurnEnd();
+          this.handleAITurn();
+          return;
+        }
+        if (check.reason === 'mine') {
+          this.campaign.handleMineHit(cell, check.index, check.layer);
+          this.campaign.onPlayerTurnEnd();
+          this.handleAITurn();
+          return;
+        }
+      }
+    }
 
     // Set the turn processing flag to prevent multiple attacks
     this.isProcessingTurn = true;
@@ -2188,9 +2247,23 @@ _initCombat() {
       return;
     }
     
+    // Campaign: track hits and misses for fog/decay modifiers
+    if (this.campaign?.activeMission && boardId.includes('opponent')) {
+      if (result.hit) {
+        this.campaign.afterPlayerHit(layer, index, cell);
+        this.campaign.onPlayerHitContinue();
+      } else {
+        this.campaign.afterPlayerMiss(layer, index, cell);
+      }
+    }
+
     // Handle turn switching
     if (this.gameState.gameMode === 'ai') {
       if (!result.hit) {
+        // Campaign: process fog/decay on turn end
+        if (this.campaign?.activeMission) {
+          this.campaign.onPlayerTurnEnd();
+        }
         // If player misses, AI gets a turn
         this.handleAITurn();
         // Note: isProcessingTurn will be reset at the end of AI's turn
@@ -2356,6 +2429,10 @@ handleAITurn() {
       } else {
         // AI's turn is over, reset the processing flag
         this.isProcessingTurn = false;
+        // Campaign: notify player turn is starting
+        if (this.campaign?.activeMission) {
+          this.campaign.onPlayerTurnStart();
+        }
       }
     }, 1000);
     
@@ -3280,6 +3357,19 @@ placeTreasureChests() {
 
     const cellValue = targetBoards[layer][index];
 
+    // Special case for mines (campaign mode)
+    if (cellValue === 'Mine') {
+      targetBoards[layer][index] = "miss";
+      return {
+        hit: false,
+        mine: true,
+        index,
+        layer,
+        boardId,
+        gameOver: { isOver: false }
+      };
+    }
+
     // Special case for treasure chest
     if (cellValue === 'Treasure') {
       targetBoards[layer][index] = "hit";
@@ -3338,9 +3428,8 @@ placeTreasureChests() {
   
   checkGameOver() {
     const checkAllSunk = (ships) => {
-      return Object.values(ships).every(ship => 
-        ship.positions.length > 0 && ship.isSunk
-      );
+      const placed = Object.values(ships).filter(ship => ship.positions.length > 0);
+      return placed.length > 0 && placed.every(ship => ship.isSunk);
     };
     
     const playerLost = checkAllSunk(this.ships.player);
@@ -4674,6 +4763,10 @@ showSonarEffect(side, layer, centerIndex) {
   }
 
   renderMainMenu() {
+    // Clean up campaign state if active
+    if (this.game.campaign?.activeMission) {
+      this.game.campaign.cleanup();
+    }
     document.getElementById('gameMenu').style.display = 'flex';
     document.getElementById('shipCounter').classList.remove('visible');
     document.getElementById('keyboardHint').classList.remove('visible');
@@ -4911,6 +5004,12 @@ showSonarEffect(side, layer, centerIndex) {
   }
   
 showGameOver(result) {
+  // Campaign: show campaign debriefing instead of normal game over
+  if (this.game.campaign?.activeMission) {
+    this.game.campaign.showDebriefing(result);
+    return;
+  }
+
   const isVictory = result.winner === 'player';
   let winnerText;
   if (result.mode === 'human') {
@@ -5080,6 +5179,817 @@ class Tutorial {
       overlay.remove();
       this.showStep();
     });
+  }
+}
+
+/* --- Campaign Manager --- */
+class CampaignManager {
+  constructor(game) {
+    this.game = game;
+    this.activeMission = null;
+    this.modifierState = {};
+    this.playerTurnCount = 0;
+    this.missions = this._defineMissions();
+    this.progress = this._loadProgress();
+  }
+
+  _defineMissions() {
+    return [
+      {
+        id: 1, act: 1, actName: "RISING TIDE",
+        name: "First Contact",
+        subtitle: "Begin your command",
+        briefing: "Commander, welcome to the fleet. Intel reports a small enemy patrol in the sector. Engage and destroy all enemy vessels. This is your proving ground — show us what you're made of.",
+        difficulty: "Recruit",
+        isBoss: false,
+        modifiers: [],
+        aiConfig: { unpredictability: 0.35, clusterPreference: false },
+        starThresholds: { three: 65, two: 45 }
+      },
+      {
+        id: 2, act: 1, actName: "RISING TIDE",
+        name: "Fog Bank",
+        subtitle: "Trust your instruments",
+        briefing: "A dense electromagnetic fog has rolled across the combat zone. Your targeting sensors are degrading — missed shots will fade from your display after 2 turns. Mark your targets carefully, Commander. Memory is your greatest weapon.",
+        difficulty: "Recruit",
+        isBoss: false,
+        modifiers: ['fog_of_war'],
+        fogTurns: 2,
+        aiConfig: { unpredictability: 0.30, clusterPreference: false },
+        starThresholds: { three: 60, two: 40 }
+      },
+      {
+        id: 3, act: 1, actName: "RISING TIDE",
+        name: "The Hydra",
+        subtitle: "Cut one head, two more appear",
+        briefing: "PRIORITY ALERT: You are engaging Commander Hydra's reinforced battle group. Intelligence confirms an additional Destroyer has joined their fleet — that's 6 ships, not 5. The Hydra earned their name by always having more forces than expected. Strike fast, strike true.",
+        difficulty: "Dangerous",
+        isBoss: true,
+        bossTitle: "MINI-BOSS",
+        modifiers: ['enemy_reinforcements'],
+        extraShips: [{ name: 'Destroyer', size: 2, shape: 'line', layer: 'Sea', symbol: '🛥️' }],
+        aiConfig: { unpredictability: 0.18, clusterPreference: true },
+        starThresholds: { three: 55, two: 35 }
+      },
+      {
+        id: 4, act: 2, actName: "STORM FRONT",
+        name: "Rapid Response",
+        subtitle: "Speed is survival",
+        briefing: "Enemy forces are executing rapid tactical maneuvers. Command has authorized emergency engagement protocols — you have 10 seconds per attack. Hesitation means defeat. Trust your instincts, Commander.",
+        difficulty: "Soldier",
+        isBoss: false,
+        modifiers: ['turn_timer'],
+        turnTimerSeconds: 10,
+        aiConfig: { unpredictability: 0.25, clusterPreference: false },
+        starThresholds: { three: 60, two: 40 }
+      },
+      {
+        id: 5, act: 2, actName: "STORM FRONT",
+        name: "Dark Waters",
+        subtitle: "Blind in the deep",
+        briefing: "Enemy submarines have deployed deep-sea signal jammers. Your sonar returns in the underwater layer are unreliable — missed pings will vanish from your display. The enemy commander knows these dark waters well. Proceed with extreme caution.",
+        difficulty: "Veteran",
+        isBoss: false,
+        modifiers: ['layer_fog'],
+        fogLayers: ['Sub'],
+        fogTurns: 2,
+        aiConfig: { unpredictability: 0.20, clusterPreference: false },
+        starThresholds: { three: 55, two: 35 }
+      },
+      {
+        id: 6, act: 2, actName: "STORM FRONT",
+        name: "Minefield",
+        subtitle: "Every click could be your last",
+        briefing: "WARNING: Naval mines have been detected in the enemy's waters. 3 concealed mines are hidden among their sea grid. Strike a mine and the blast will stun your fleet, giving the enemy a free attack. Choose your targets wisely — or pay the price.",
+        difficulty: "Veteran",
+        isBoss: false,
+        modifiers: ['mines'],
+        mineCount: 3,
+        aiConfig: { unpredictability: 0.22, clusterPreference: false },
+        starThresholds: { three: 55, two: 35 }
+      },
+      {
+        id: 7, act: 2, actName: "STORM FRONT",
+        name: "The Kraken",
+        subtitle: "Fight the impossible",
+        briefing: "CRITICAL ALERT: Your submarine was destroyed in a pre-battle ambush — you fight with only 4 ships. Worse, enemy Commander Kraken has equipped all vessels with experimental deflector shields. The first strike on each enemy ship will be absorbed. You are outgunned and outmatched. The brass says this mission is suicide. Prove them wrong.",
+        difficulty: "Dangerous",
+        isBoss: true,
+        bossTitle: "MINI-BOSS",
+        modifiers: ['reduced_fleet', 'shields'],
+        removedShips: ['Submarine'],
+        aiConfig: { unpredictability: 0.12, clusterPreference: true },
+        starThresholds: { three: 50, two: 30 }
+      },
+      {
+        id: 8, act: 3, actName: "OPERATION TRIDENT",
+        name: "Phantom Fleet",
+        subtitle: "Now you see them...",
+        briefing: "The enemy has deployed advanced stealth plating. Your confirmed hits will degrade and fade from your tactical display after 3 turns. You must track your strikes mentally — your instruments cannot be trusted. Discipline and memory are your only allies.",
+        difficulty: "Elite",
+        isBoss: false,
+        modifiers: ['hit_decay'],
+        decayTurns: 3,
+        aiConfig: { unpredictability: 0.15, clusterPreference: false },
+        starThresholds: { three: 50, two: 30 }
+      },
+      {
+        id: 9, act: 3, actName: "OPERATION TRIDENT",
+        name: "Iron Curtain",
+        subtitle: "Break through their armor",
+        briefing: "The enemy's elite guard fleet is equipped with full deflector shield arrays. Every ship in their fleet can absorb one direct hit before taking damage. Your weapons are effective, but you must break through their shields first. Persistence is victory, Commander.",
+        difficulty: "Elite",
+        isBoss: false,
+        modifiers: ['shields'],
+        aiConfig: { unpredictability: 0.10, clusterPreference: false },
+        starThresholds: { three: 50, two: 30 }
+      },
+      {
+        id: 10, act: 3, actName: "OPERATION TRIDENT",
+        name: "The Admiral",
+        subtitle: "End this war",
+        briefing: "This is it, Commander. Admiral Voss — the architect of this war — commands the most formidable fleet ever assembled. Reinforced with an extra Destroyer. Every ship shielded. Stealth technology rendering your hit data unstable. Sensor fog obscuring your misses. This is the battle that decides everything. There will be no retreat. No reinforcements. Only victory or oblivion. Make every shot count. The world is watching.",
+        difficulty: "Legendary",
+        isBoss: true,
+        bossTitle: "FINAL BOSS",
+        modifiers: ['shields', 'hit_decay', 'fog_of_war', 'enemy_reinforcements'],
+        extraShips: [{ name: 'Destroyer', size: 2, shape: 'line', layer: 'Sea', symbol: '🛥️' }],
+        decayTurns: 4,
+        fogTurns: 3,
+        aiConfig: { unpredictability: 0.05, clusterPreference: true },
+        starThresholds: { three: 45, two: 25 }
+      }
+    ];
+  }
+
+  _loadProgress() {
+    try {
+      const saved = localStorage.getItem('warZonesCampaign');
+      if (saved) return JSON.parse(saved);
+    } catch (e) { console.error('Failed to load campaign progress:', e); }
+    return { missions: {}, highestUnlocked: 1, totalStars: 0 };
+  }
+
+  _saveProgress() {
+    try {
+      localStorage.setItem('warZonesCampaign', JSON.stringify(this.progress));
+    } catch (e) { console.error('Failed to save campaign progress:', e); }
+  }
+
+  resetProgress() {
+    this.progress = { missions: {}, highestUnlocked: 1, totalStars: 0 };
+    this._saveProgress();
+  }
+
+  getMission(id) {
+    return this.missions.find(m => m.id === id);
+  }
+
+  isMissionUnlocked(id) {
+    return id <= this.progress.highestUnlocked;
+  }
+
+  getMissionStars(id) {
+    return this.progress.missions[id]?.stars || 0;
+  }
+
+  // ========== UI: Campaign Map ==========
+  showCampaignMap() {
+    const existing = document.getElementById('campaignOverlay');
+    if (existing) existing.remove();
+
+    this.game.ui.hideMainMenu();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'campaign-overlay';
+    overlay.id = 'campaignOverlay';
+
+    const totalStars = this.progress.totalStars || 0;
+    const maxStars = this.missions.length * 3;
+
+    let mapHTML = '';
+    let currentAct = 0;
+
+    this.missions.forEach((mission, i) => {
+      if (mission.act !== currentAct) {
+        currentAct = mission.act;
+        mapHTML += `<div class="campaign-act-header"><span class="act-line"></span><span class="act-name">ACT ${currentAct}: ${mission.actName}</span><span class="act-line"></span></div>`;
+      }
+
+      const unlocked = this.isMissionUnlocked(mission.id);
+      const stars = this.getMissionStars(mission.id);
+      const completed = stars > 0;
+      const bossClass = mission.isBoss ? (mission.bossTitle === 'FINAL BOSS' ? 'node-final-boss' : 'node-mini-boss') : '';
+      const lockedClass = !unlocked ? 'locked' : '';
+      const completedClass = completed ? 'completed' : '';
+
+      mapHTML += `
+        <div class="campaign-mission-node ${bossClass} ${lockedClass} ${completedClass}" data-mission-id="${mission.id}">
+          <div class="mission-node-number">${mission.isBoss ? (mission.bossTitle === 'FINAL BOSS' ? '☠' : '⚔') : mission.id}</div>
+          <div class="mission-node-info">
+            <div class="mission-node-name">${mission.isBoss ? mission.bossTitle + ': ' : ''}${mission.name}</div>
+            <div class="mission-node-subtitle">${mission.subtitle}</div>
+            <div class="mission-node-difficulty difficulty-${mission.difficulty.toLowerCase()}">${mission.difficulty}</div>
+          </div>
+          <div class="mission-node-stars">
+            ${unlocked ? this._renderStars(stars) : '<span class="lock-icon">🔒</span>'}
+          </div>
+        </div>
+        ${i < this.missions.length - 1 ? '<div class="campaign-path-connector' + (!this.isMissionUnlocked(this.missions[i + 1].id) ? ' locked' : '') + '"></div>' : ''}
+      `;
+    });
+
+    overlay.innerHTML = `
+      <div class="campaign-content">
+        <div class="campaign-header">
+          <h1 class="campaign-title">OPERATION TRIDENT</h1>
+          <div class="campaign-subtitle">Campaign Mode</div>
+          <div class="campaign-star-total">${totalStars} / ${maxStars} Stars</div>
+        </div>
+        <div class="campaign-map-scroll">
+          <div class="campaign-map">
+            ${mapHTML}
+          </div>
+        </div>
+        <div class="campaign-buttons">
+          <button id="campaignBack" class="menu-button">Back to Menu</button>
+          <button id="campaignReset" class="menu-button secondary campaign-reset-btn">Reset Progress</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#campaignBack').addEventListener('click', () => {
+      overlay.remove();
+      this.game.ui.renderMainMenu();
+    });
+
+    overlay.querySelector('#campaignReset').addEventListener('click', () => {
+      if (confirm('Reset all campaign progress? This cannot be undone.')) {
+        this.resetProgress();
+        overlay.remove();
+        this.showCampaignMap();
+      }
+    });
+
+    overlay.querySelectorAll('.campaign-mission-node:not(.locked)').forEach(node => {
+      node.style.cursor = 'pointer';
+      node.addEventListener('click', () => {
+        const missionId = parseInt(node.dataset.missionId);
+        this.showBriefing(missionId);
+      });
+    });
+  }
+
+  _renderStars(count) {
+    let html = '';
+    for (let i = 0; i < 3; i++) {
+      html += `<span class="star ${i < count ? 'earned' : 'empty'}">${i < count ? '★' : '☆'}</span>`;
+    }
+    return html;
+  }
+
+  // ========== UI: Mission Briefing ==========
+  showBriefing(missionId) {
+    const mission = this.getMission(missionId);
+    if (!mission) return;
+
+    const existing = document.getElementById('briefingOverlay');
+    if (existing) existing.remove();
+
+    const modifierTags = mission.modifiers.map(mod => {
+      const labels = {
+        'fog_of_war': '🌫️ Fog of War',
+        'layer_fog': '🌊 Sonar Jam',
+        'turn_timer': '⏱️ Time Pressure',
+        'enemy_reinforcements': '🛥️ Reinforcements',
+        'shields': '🛡️ Shields',
+        'hit_decay': '👻 Hit Decay',
+        'mines': '💣 Mines',
+        'reduced_fleet': '📉 Reduced Fleet'
+      };
+      return `<span class="modifier-tag">${labels[mod] || mod}</span>`;
+    }).join('');
+
+    const bossClass = mission.isBoss ? (mission.bossTitle === 'FINAL BOSS' ? 'briefing-final-boss' : 'briefing-mini-boss') : '';
+    const bestStars = this.getMissionStars(mission.id);
+    const bestAccuracy = this.progress.missions[mission.id]?.accuracy || 0;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'briefing-overlay';
+    overlay.id = 'briefingOverlay';
+    overlay.innerHTML = `
+      <div class="briefing-content ${bossClass}">
+        <div class="briefing-header">
+          ${mission.isBoss ? `<div class="briefing-boss-tag">${mission.bossTitle}</div>` : ''}
+          <div class="briefing-act">ACT ${mission.act}: ${mission.actName}</div>
+          <h2 class="briefing-title">Mission ${mission.id}: ${mission.name}</h2>
+          <div class="briefing-subtitle">${mission.subtitle}</div>
+          <div class="briefing-difficulty difficulty-${mission.difficulty.toLowerCase()}">${mission.difficulty}</div>
+        </div>
+        <div class="briefing-text">${mission.briefing}</div>
+        ${mission.modifiers.length > 0 ? `
+          <div class="briefing-modifiers">
+            <div class="modifiers-label">ACTIVE MODIFIERS</div>
+            <div class="modifiers-list">${modifierTags}</div>
+          </div>
+        ` : ''}
+        <div class="briefing-best">
+          ${bestStars > 0
+            ? `<div class="best-score">Best: ${this._renderStars(bestStars)} (${bestAccuracy}% accuracy)</div>`
+            : '<div class="best-score">Not yet completed</div>'}
+        </div>
+        <div class="briefing-buttons">
+          <button id="deployBtn" class="menu-button deploy-btn">DEPLOY</button>
+          <button id="briefingBack" class="menu-button secondary">Back</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#deployBtn').addEventListener('click', () => {
+      overlay.remove();
+      const campaignOverlay = document.getElementById('campaignOverlay');
+      if (campaignOverlay) campaignOverlay.remove();
+      this.launchMission(mission.id);
+    });
+
+    overlay.querySelector('#briefingBack').addEventListener('click', () => {
+      overlay.remove();
+    });
+  }
+
+  // ========== Mission Lifecycle ==========
+  launchMission(missionId) {
+    const mission = this.getMission(missionId);
+    if (!mission) return;
+
+    this.activeMission = mission;
+    this.playerTurnCount = 0;
+    this.modifierState = {};
+
+    if (mission.modifiers.includes('fog_of_war') || mission.modifiers.includes('layer_fog')) {
+      this.modifierState.foggedCells = [];
+    }
+    if (mission.modifiers.includes('hit_decay')) {
+      this.modifierState.hitCells = [];
+    }
+    if (mission.modifiers.includes('turn_timer')) {
+      this.modifierState.timerInterval = null;
+      this.modifierState.timerSeconds = mission.turnTimerSeconds || 10;
+      this.modifierState.timerRemaining = this.modifierState.timerSeconds;
+    }
+    if (mission.modifiers.includes('shields')) {
+      this.modifierState.shieldBroken = {};
+    }
+    if (mission.modifiers.includes('mines')) {
+      this.modifierState.mines = [];
+      this.modifierState.mineCount = mission.mineCount || 3;
+    }
+    if (mission.modifiers.includes('reduced_fleet')) {
+      this.modifierState.skippedShips = mission.removedShips || [];
+    }
+
+    document.getElementById('player2Name').textContent = mission.isBoss ? mission.name : "Enemy";
+    document.getElementById('player2Icon').textContent = mission.isBoss ? '☠️' : '🤖';
+    this.game.gameState.gameMode = 'ai';
+    this.game.sound.initialize();
+    this.game.startNewGame('ai');
+  }
+
+  // Called right after AI ships are placed, before combat begins
+  onCombatStart() {
+    if (!this.activeMission) return;
+
+    const config = this.activeMission.aiConfig;
+    if (config.unpredictability !== undefined) {
+      this.game.ai.personality.unpredictability = config.unpredictability;
+    }
+    if (config.clusterPreference !== undefined) {
+      this.game.ai.personality.clusterPreference = config.clusterPreference;
+    }
+
+    if (this.activeMission.modifiers.includes('enemy_reinforcements') && this.activeMission.extraShips) {
+      this._placeExtraShips();
+    }
+
+    if (this.activeMission.modifiers.includes('mines')) {
+      this._placeMines();
+    }
+
+    if (this.activeMission.modifiers.includes('turn_timer')) {
+      // Timer will start when player turn begins
+    }
+
+    // Show mission active notification
+    if (this.activeMission.modifiers.length > 0) {
+      const modNames = this.activeMission.modifiers.map(mod => {
+        const labels = {
+          'fog_of_war': 'FOG OF WAR', 'layer_fog': 'SONAR JAM',
+          'turn_timer': 'TIME PRESSURE', 'enemy_reinforcements': 'REINFORCEMENTS',
+          'shields': 'DEFLECTOR SHIELDS', 'hit_decay': 'HIT DECAY',
+          'mines': 'NAVAL MINES', 'reduced_fleet': 'REDUCED FLEET'
+        };
+        return labels[mod] || mod;
+      });
+      setTimeout(() => {
+        this.game.ui.updateCommentary(`Mission: ${this.activeMission.name} | ${modNames.join(' + ')}`);
+        this.game.animateCommentaryBox();
+      }, 1500);
+    }
+  }
+
+  _placeExtraShips() {
+    const gs = this.game.gameState;
+    for (const extra of this.activeMission.extraShips) {
+      let placed = false;
+      let attempts = 0;
+      while (!placed && attempts < 100) {
+        const layer = extra.layer;
+        const index = Math.floor(Math.random() * (GAME_CONSTANTS.BOARD_SIZE ** 2));
+        const rotation = Math.random() > 0.5 ? 'horizontal' : 'vertical';
+        const positions = [];
+        const boardSize = GAME_CONSTANTS.BOARD_SIZE;
+        const row = Math.floor(index / boardSize);
+        const col = index % boardSize;
+
+        if (extra.shape === 'line') {
+          if (rotation === 'horizontal' && col + extra.size <= boardSize) {
+            for (let i = 0; i < extra.size; i++) positions.push(index + i);
+          } else if (rotation === 'vertical' && row + extra.size <= boardSize) {
+            for (let i = 0; i < extra.size; i++) positions.push(index + (i * boardSize));
+          }
+        }
+
+        if (positions.length === extra.size && positions.every(pos => gs.boards.opponent[layer][pos] === null)) {
+          positions.forEach(pos => { gs.boards.opponent[layer][pos] = extra.name; });
+          gs.ships.opponent[extra.name] = { positions, hits: [], isSunk: false };
+          placed = true;
+        }
+        attempts++;
+      }
+    }
+  }
+
+  _placeMines() {
+    const gs = this.game.gameState;
+    const layer = 'Sea';
+    const emptyCells = [];
+    for (let i = 0; i < GAME_CONSTANTS.BOARD_SIZE ** 2; i++) {
+      if (gs.boards.opponent[layer][i] === null) {
+        emptyCells.push(i);
+      }
+    }
+    for (let i = emptyCells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [emptyCells[i], emptyCells[j]] = [emptyCells[j], emptyCells[i]];
+    }
+    const mineCount = Math.min(this.modifierState.mineCount, emptyCells.length);
+    for (let i = 0; i < mineCount; i++) {
+      gs.boards.opponent[layer][emptyCells[i]] = 'Mine';
+      this.modifierState.mines.push(emptyCells[i]);
+    }
+  }
+
+  // ========== Modifier Hooks ==========
+  beforePlayerAttack(index, layer) {
+    if (!this.activeMission) return { blocked: false };
+    const gs = this.game.gameState;
+    const cellValue = gs.boards.opponent[layer][index];
+
+    // Check for mines
+    if (cellValue === 'Mine') {
+      return { blocked: true, reason: 'mine', index, layer };
+    }
+
+    // Check for shields
+    if (this.activeMission.modifiers.includes('shields')) {
+      if (cellValue && cellValue !== 'hit' && cellValue !== 'miss' && cellValue !== 'Treasure' && cellValue !== 'Mine') {
+        const shipType = cellValue;
+        if (!this.modifierState.shieldBroken[shipType]) {
+          return { blocked: true, reason: 'shield', shipType, index, layer };
+        }
+      }
+    }
+
+    return { blocked: false };
+  }
+
+  handleShieldBlock(cell, shipType) {
+    this.modifierState.shieldBroken[shipType] = true;
+    cell.classList.add('shield-deflect');
+    cell.textContent = '🛡️';
+    setTimeout(() => {
+      cell.classList.remove('shield-deflect');
+      cell.textContent = '';
+    }, 1200);
+    this.game.sound.playSound('miss');
+    this.game.animations.playScreenShake(false);
+    this.game.ui.updateCommentary(`${shipType}'s deflector shield absorbed the hit! Shield is now DOWN.`);
+    this.game.animateCommentaryBox();
+    this.game.gameState.shots.player.total++;
+  }
+
+  handleMineHit(cell, index, layer) {
+    const gs = this.game.gameState;
+    gs.boards.opponent[layer][index] = 'miss';
+    this.modifierState.mines = this.modifierState.mines.filter(m => m !== index);
+    cell.classList.add('miss', 'mine-exploded');
+    cell.textContent = '💣';
+    this.game.sound.playSound('sunk');
+    this.game.animations.playExplosion(cell);
+    this.game.animations.playScreenShake(true);
+    gs.shots.player.total++;
+    this.game.ui.updateCommentary("MINE! The blast stuns your fleet — enemy gets a bonus attack!");
+    this.game.animateCommentaryBox();
+  }
+
+  afterPlayerMiss(layer, index, cell) {
+    if (!this.activeMission) return;
+    const isFogActive = this.activeMission.modifiers.includes('fog_of_war') ||
+      (this.activeMission.modifiers.includes('layer_fog') &&
+       this.activeMission.fogLayers?.includes(layer));
+
+    if (isFogActive) {
+      this.modifierState.foggedCells?.push({
+        layer, index, turnPlaced: this.playerTurnCount, cell
+      });
+    }
+  }
+
+  afterPlayerHit(layer, index, cell) {
+    if (!this.activeMission) return;
+    if (this.activeMission.modifiers.includes('hit_decay')) {
+      this.modifierState.hitCells?.push({
+        layer, index, turnPlaced: this.playerTurnCount, cell
+      });
+    }
+  }
+
+  onPlayerTurnEnd() {
+    if (!this.activeMission) return;
+    this.playerTurnCount++;
+    this._processFog();
+    this._processHitDecay();
+    this.stopTurnTimer();
+  }
+
+  onPlayerTurnStart() {
+    if (!this.activeMission) return;
+    if (this.activeMission.modifiers.includes('turn_timer')) {
+      this.startTurnTimer();
+    }
+  }
+
+  onPlayerHitContinue() {
+    if (!this.activeMission) return;
+    if (this.activeMission.modifiers.includes('turn_timer')) {
+      this.resetTurnTimer();
+    }
+  }
+
+  _processFog() {
+    if (!this.modifierState.foggedCells) return;
+    const fogTurns = this.activeMission.fogTurns || 2;
+    this.modifierState.foggedCells = this.modifierState.foggedCells.filter(entry => {
+      if (this.playerTurnCount - entry.turnPlaced >= fogTurns) {
+        if (entry.cell && entry.cell.classList.contains('miss')) {
+          entry.cell.classList.remove('miss');
+          entry.cell.classList.add('fogged');
+          entry.cell.textContent = '';
+        }
+        return false;
+      }
+      return true;
+    });
+  }
+
+  _processHitDecay() {
+    if (!this.modifierState.hitCells) return;
+    const decayTurns = this.activeMission.decayTurns || 3;
+    this.modifierState.hitCells = this.modifierState.hitCells.filter(entry => {
+      if (this.playerTurnCount - entry.turnPlaced >= decayTurns) {
+        if (entry.cell) {
+          entry.cell.classList.remove('hit');
+          entry.cell.classList.add('decayed');
+          entry.cell.textContent = '?';
+        }
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // ========== Turn Timer ==========
+  startTurnTimer() {
+    this.stopTurnTimer();
+    if (!this.activeMission?.modifiers.includes('turn_timer')) return;
+    this.modifierState.timerRemaining = this.modifierState.timerSeconds;
+    this._showTimerUI();
+    this._updateTimerDisplay();
+    this.modifierState.timerInterval = setInterval(() => {
+      this.modifierState.timerRemaining--;
+      this._updateTimerDisplay();
+      if (this.modifierState.timerRemaining <= 0) {
+        this.stopTurnTimer();
+        this._timerExpired();
+      }
+    }, 1000);
+  }
+
+  resetTurnTimer() {
+    if (this.modifierState.timerInterval) {
+      this.modifierState.timerRemaining = this.modifierState.timerSeconds;
+      this._updateTimerDisplay();
+    }
+  }
+
+  stopTurnTimer() {
+    if (this.modifierState.timerInterval) {
+      clearInterval(this.modifierState.timerInterval);
+      this.modifierState.timerInterval = null;
+    }
+    this._hideTimerUI();
+  }
+
+  _timerExpired() {
+    if (this.game.gameState.phase !== 'combat') return;
+    if (this.game.isProcessingTurn) return;
+    this.game.ui.updateCommentary("TIME'S UP! Turn passes to the enemy!");
+    this.game.animateCommentaryBox();
+    this.game.animations.playScreenShake(false);
+    this.onPlayerTurnEnd();
+    this.game.isProcessingTurn = true;
+    this.game.handleAITurn();
+  }
+
+  _showTimerUI() {
+    let timerEl = document.getElementById('turnTimer');
+    if (!timerEl) {
+      timerEl = document.createElement('div');
+      timerEl.id = 'turnTimer';
+      timerEl.className = 'turn-timer';
+      timerEl.innerHTML = '<div class="turn-timer-bar"></div><span class="turn-timer-text"></span>';
+      const commentary = document.getElementById('commentaryBox');
+      if (commentary) commentary.after(timerEl);
+    }
+    timerEl.classList.remove('hidden');
+  }
+
+  _hideTimerUI() {
+    const timerEl = document.getElementById('turnTimer');
+    if (timerEl) timerEl.classList.add('hidden');
+  }
+
+  _updateTimerDisplay() {
+    const timerEl = document.getElementById('turnTimer');
+    if (!timerEl) return;
+    const remaining = this.modifierState.timerRemaining;
+    const total = this.modifierState.timerSeconds;
+    const pct = (remaining / total) * 100;
+    const bar = timerEl.querySelector('.turn-timer-bar');
+    const text = timerEl.querySelector('.turn-timer-text');
+    if (bar) bar.style.width = `${pct}%`;
+    if (text) text.textContent = `${remaining}s`;
+    timerEl.className = 'turn-timer';
+    if (remaining <= 3) timerEl.classList.add('critical');
+    else if (remaining <= 5) timerEl.classList.add('warning');
+  }
+
+  // ========== Skip Ships (Reduced Fleet) ==========
+  shouldSkipShip(shipType) {
+    if (!this.activeMission) return false;
+    return this.modifierState.skippedShips?.includes(shipType) || false;
+  }
+
+  // ========== Mission Completion ==========
+  completeMission(won, accuracy) {
+    if (!this.activeMission) return null;
+    this.stopTurnTimer();
+    const mission = this.activeMission;
+    let stars = 0;
+
+    if (won) {
+      stars = 1;
+      if (accuracy >= mission.starThresholds.two) stars = 2;
+      if (accuracy >= mission.starThresholds.three) stars = 3;
+
+      const prev = this.progress.missions[mission.id]?.stars || 0;
+      if (stars >= prev) {
+        this.progress.missions[mission.id] = { stars, accuracy, completed: true };
+      }
+
+      if (mission.id >= this.progress.highestUnlocked && mission.id < this.missions.length) {
+        this.progress.highestUnlocked = mission.id + 1;
+      }
+
+      this.progress.totalStars = Object.values(this.progress.missions)
+        .reduce((sum, m) => sum + (m.stars || 0), 0);
+      this._saveProgress();
+    }
+
+    return { stars, mission };
+  }
+
+  // ========== Campaign Game Over (Debriefing) ==========
+  showDebriefing(result) {
+    const isVictory = result.winner === 'player';
+    const mission = this.activeMission;
+    if (!mission) return;
+
+    const shotsData = this.game.gameState.shots.player;
+    const shots = shotsData.total || 0;
+    const hits = shotsData.hits || 0;
+    const accuracy = shots > 0 ? Math.round((hits / shots) * 100) : 0;
+    const elapsed = this.game.gameState.startTime ? Math.floor((Date.now() - this.game.gameState.startTime) / 1000) : 0;
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    const completionResult = this.completeMission(isVictory, accuracy);
+    const stars = completionResult?.stars || 0;
+
+    const bossClass = mission.isBoss ? (mission.bossTitle === 'FINAL BOSS' ? 'debrief-final-boss' : 'debrief-mini-boss') : '';
+    const hasNext = mission.id < this.missions.length && isVictory;
+    const isFinalBossVictory = mission.id === 10 && isVictory;
+
+    const overlay = document.createElement('div');
+    overlay.className = `game-over-overlay campaign-debrief ${isVictory ? 'victory-overlay' : 'defeat-overlay'} ${bossClass}`;
+    overlay.id = 'gameOverOverlay';
+
+    overlay.innerHTML = `
+      <div class="game-over-content campaign-debrief-content">
+        <div class="debrief-header">
+          ${isFinalBossVictory ? '<div class="final-victory-text">THE WAR IS OVER</div>' : ''}
+          <h2>${isVictory ? (mission.isBoss ? 'BOSS DEFEATED' : 'MISSION COMPLETE') : 'MISSION FAILED'}</h2>
+          <div class="debrief-mission-name">${mission.isBoss ? mission.bossTitle + ': ' : ''}${mission.name}</div>
+        </div>
+        ${isVictory ? `
+          <div class="debrief-stars">
+            <div class="star-display">
+              ${[1, 2, 3].map(i => `<span class="debrief-star ${i <= stars ? 'earned' : ''}" style="animation-delay: ${0.3 + i * 0.3}s">${i <= stars ? '★' : '☆'}</span>`).join('')}
+            </div>
+            <div class="star-label">${stars === 3 ? 'PERFECT' : stars === 2 ? 'GREAT' : 'CLEARED'}</div>
+          </div>
+        ` : `
+          <div class="debrief-defeat-msg">
+            ${mission.isBoss ? "The enemy commander proved too strong... this time." : "Regroup and try again, Commander."}
+          </div>
+        `}
+        <div class="stats">
+          <p>Shots Fired: ${shots}</p>
+          <p>Hits: ${hits}</p>
+          <p>Accuracy: <span class="accuracy-value">${accuracy}%</span></p>
+          <p>Time: ${timeStr}</p>
+        </div>
+        ${isFinalBossVictory ? `
+          <div class="final-victory-msg">
+            Admiral Voss has been defeated. The fleet is saved.<br>
+            Your name will echo through the ages, Commander.<br>
+            Total Stars: ${this.progress.totalStars} / ${this.missions.length * 3}
+          </div>
+        ` : ''}
+        <div class="game-over-buttons">
+          ${hasNext ? `<button id="nextMissionBtn" class="game-over-button campaign-next-btn">Next Mission</button>` : ''}
+          <button id="retryMissionBtn" class="game-over-button">${isVictory ? 'Replay' : 'Retry'}</button>
+          <button id="campaignMapBtn" class="game-over-button">Campaign Map</button>
+        </div>
+      </div>
+    `;
+
+    const existingOverlay = document.getElementById('gameOverOverlay');
+    if (existingOverlay) existingOverlay.remove();
+    document.body.appendChild(overlay);
+
+    if (isVictory) {
+      this.game.animations.playConfetti(overlay);
+    }
+
+    if (hasNext) {
+      overlay.querySelector('#nextMissionBtn').addEventListener('click', () => {
+        overlay.remove();
+        this.launchMission(mission.id + 1);
+      });
+    }
+
+    overlay.querySelector('#retryMissionBtn').addEventListener('click', () => {
+      overlay.remove();
+      this.launchMission(mission.id);
+    });
+
+    overlay.querySelector('#campaignMapBtn').addEventListener('click', () => {
+      overlay.remove();
+      this.activeMission = null;
+      this.showCampaignMap();
+    });
+  }
+
+  cleanup() {
+    this.stopTurnTimer();
+    this.activeMission = null;
+    this.modifierState = {};
+    this.playerTurnCount = 0;
   }
 }
 
