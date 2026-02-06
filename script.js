@@ -858,6 +858,7 @@ aiUseKryptonLaser() {
       this.ai.recordHit(layer, targetIndex);
       hitCount++;
       if (result.sunk) {
+        this.ai.recordSunk(layer, result.shipType);
         sunkCount++;
         this.sound.playSound('sunk');
         this.animations.playSunkAnimation(
@@ -945,6 +946,7 @@ aiUseCannonBall() {
         this.ai.recordHit('Sea', attackIndex);
         hitCount++;
         if (result.sunk) {
+          this.ai.recordSunk('Sea', result.shipType);
           sunkCount++;
           this.sound.playSound('sunk');
           this.animations.playSunkAnimation(
@@ -2369,8 +2371,9 @@ handleAITurn() {
       // Update AI's memory of the move
       if (aiResult.hit) {
         this.ai.recordHit(layer, aiMove.index);
-        
+
         if (aiResult.sunk) {
+          this.ai.recordSunk(layer, aiResult.shipType);
           this.ui.updateCommentary(`AI destroyed your ${aiResult.shipType}!`);
         } else {
           this.ui.updateCommentary(`AI hit your ${aiResult.shipType}!`);
@@ -3533,6 +3536,14 @@ class GameAI {
     // Random starting patterns
     this.skyPattern = this.generateRandomPattern();
     
+    // Track which ships have been sunk per layer
+    this.sunkShips = {
+      Space: [],
+      Sky: [],
+      Sea: [],
+      Sub: []
+    };
+
     // Randomize AI "personality"
     this.personality = {
       // How often AI breaks optimal pattern (0-1)
@@ -3544,11 +3555,11 @@ class GameAI {
       // Random seed for this game
       seed: Math.floor(Math.random() * 1000)
     };
-    
+
     // Probability maps for better initial targeting
     this.probabilityMaps = this.initProbabilityMaps();
   }
-  
+
   reset() {
     this.layerState = {
       Space: { hits: [], foundOrientation: null, possiblePositions: [] },
@@ -3562,10 +3573,16 @@ class GameAI {
       Sea: new Set(),
       Sub: new Set()
     };
-    
+    this.sunkShips = {
+      Space: [],
+      Sky: [],
+      Sea: [],
+      Sub: []
+    };
+
     // Generate new random patterns for next game
     this.skyPattern = this.generateRandomPattern();
-    
+
     // New personality for the AI
     this.personality = {
       unpredictability: 0.15 + Math.random() * 0.2,
@@ -3573,7 +3590,7 @@ class GameAI {
       clusterPreference: Math.random() > 0.7,
       seed: Math.floor(Math.random() * 1000)
     };
-    
+
     // Refresh probability maps for the new game
     this.probabilityMaps = this.initProbabilityMaps();
   }
@@ -3787,7 +3804,7 @@ recordShipDetection(layer, index) {
     
     // Calculate a score for each layer based on ship density and attacks left
     GAME_CONSTANTS.LAYERS.forEach(layer => {
-      if (shipCountRemaining[layer] === 0) {
+      if (shipCountRemaining[layer] === 0 || this.shipCompleted(layer)) {
         layerScores[layer] = 0;
       } else {
         const totalCells = this.boardSize * this.boardSize;
@@ -3865,25 +3882,18 @@ recordShipDetection(layer, index) {
   
   getSeaLayerShipsRemaining() {
     // Sea layer has 2 ships: Battleship (size 3) and Cruiser (size 2)
-    let shipsRemaining = 2;
-    
-    // If we're currently hunting a ship, count as 1 ship
-    if (this.layerState.Sea.hits.length > 0) {
+    let totalSeaShips = 2;
+
+    // Use sunk ship tracking for accurate count
+    const sunkOnSea = (this.sunkShips && this.sunkShips.Sea) ? this.sunkShips.Sea.length : 0;
+    let shipsRemaining = totalSeaShips - sunkOnSea;
+
+    // If we're currently hunting a ship (have unsunk hits), that ship is partially found
+    if (this.layerState.Sea.hits.length > 0 && shipsRemaining > 0) {
       shipsRemaining--;
-      
-      // If a ship is sunk (3 consecutive hits), we've found the Battleship
-      if (this.layerState.Sea.hits.length >= 3) {
-        // If we've found 3 consecutive hits and they're all in one line
-        // then we likely have found the Battleship
-        const hits = this.layerState.Sea.hits.slice().sort((a, b) => a - b);
-        
-        if (this.arePositionsConsecutive(hits)) {
-          shipsRemaining = 0;
-        }
-      }
     }
-    
-    return shipsRemaining;
+
+    return Math.max(0, shipsRemaining);
   }
   
   arePositionsConsecutive(positions) {
@@ -4521,11 +4531,30 @@ isATreasureHit(index, layer) {
   
   recordMiss(layer, index) {
     this.attackedPositions[layer].add(index);
-    
+
     // Update probability maps - reduce probability at the miss
     this.updateProbabilityMap(layer, index, false);
   }
-  
+
+  recordSunk(layer, shipType) {
+    // Track the sunk ship
+    if (!this.sunkShips[layer]) this.sunkShips[layer] = [];
+    this.sunkShips[layer].push(shipType);
+
+    // Reset hunting state for this layer so the AI can start fresh
+    // looking for the next ship (e.g., after sinking Battleship, hunt Cruiser)
+    if (this.layerState[layer]) {
+      this.layerState[layer].hits = [];
+      this.layerState[layer].foundOrientation = null;
+      if (this.layerState[layer].possiblePositions) {
+        this.layerState[layer].possiblePositions = [];
+      }
+      if (layer === 'Sea') {
+        this.layerState.Sea.foundShip = null;
+      }
+    }
+  }
+
   updateProbabilityMap(layer, index, isHit) {
     const row = Math.floor(index / this.boardSize);
     const col = index % this.boardSize;
@@ -5235,11 +5264,11 @@ class CampaignManager {
         id: 4, act: 2, actName: "STORM FRONT",
         name: "Rapid Response",
         subtitle: "Speed is survival",
-        briefing: "Enemy forces are executing rapid tactical maneuvers. Command has authorized emergency engagement protocols — you have 10 seconds per attack. Hesitation means defeat. Trust your instincts, Commander.",
+        briefing: "Enemy forces are executing rapid tactical maneuvers. Command has authorized emergency engagement protocols — you have 5 seconds per attack. Hesitation means defeat. Trust your instincts, Commander.",
         difficulty: "Soldier",
         isBoss: false,
         modifiers: ['turn_timer'],
-        turnTimerSeconds: 10,
+        turnTimerSeconds: 5,
         aiConfig: { unpredictability: 0.25, clusterPreference: false },
         starThresholds: { three: 60, two: 40 }
       },
