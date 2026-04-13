@@ -822,12 +822,26 @@ aiUseKryptonLaser() {
   const boardSize = GAME_CONSTANTS.BOARD_SIZE;
   let targetIndex = -1;
 
+  // Only consider layers where the player still has ships to hunt. This
+  // prevents wasted laser shots on layers stripped by reduced_fleet
+  // missions (e.g. Kraken removes the player's Submarine, so the Sub
+  // layer has no valid targets).
+  const layersToAttack = GAME_CONSTANTS.LAYERS.filter(layer => !this.ai.shipCompleted(layer));
+
+  // If every layer is exhausted the game should already be over; bail
+  // out defensively rather than firing the laser into empty space.
+  if (layersToAttack.length === 0) {
+    this.ui.updateCommentary("AI used Krypton Laser but had no valid targets!");
+    return;
+  }
+
   // Try to find a strategic position - look for unattacked positions
+  // in the layers we actually plan to attack.
   const allUnattacked = [];
   for (let i = 0; i < boardSize * boardSize; i++) {
-    // Check if this position has unattacked cells in any layer
+    // Check if this position has unattacked cells in any attackable layer
     let hasUnattacked = false;
-    for (const layer of GAME_CONSTANTS.LAYERS) {
+    for (const layer of layersToAttack) {
       if (!this.ai.attackedPositions[layer].has(i)) {
         hasUnattacked = true;
         break;
@@ -844,12 +858,12 @@ aiUseKryptonLaser() {
     targetIndex = Math.floor(Math.random() * boardSize * boardSize);
   }
 
-  // Attack the same position across all layers
+  // Attack the same position across all attackable layers
   let hitCount = 0;
   let sunkCount = 0;
   const results = [];
 
-  GAME_CONSTANTS.LAYERS.forEach(layer => {
+  layersToAttack.forEach(layer => {
     const boardId = `player${layer}Board`;
 
     // Skip if already attacked
