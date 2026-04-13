@@ -3803,10 +3803,10 @@ recordShipDetection(layer, index) {
     // Calculate which layer to target based on remaining ships and probability
     const layerScores = {};
     const shipCountRemaining = {
-      Space: this.layerState.Space.hits.length > 0 ? 0 : 1,
-      Sky: this.layerState.Sky.hits.length > 0 ? 0 : 1,
+      Space: this.shipCompleted('Space') ? 0 : 1,
+      Sky: this.shipCompleted('Sky') ? 0 : 1,
       Sea: this.getSeaLayerShipsRemaining(),
-      Sub: this.layerState.Sub.hits.length >= 2 ? 0 : 1
+      Sub: this.shipCompleted('Sub') ? 0 : 1
     };
     
     // Calculate a score for each layer based on ship density and attacks left
@@ -4444,40 +4444,42 @@ recordShipDetection(layer, index) {
   }
   
 shipCompleted(layer) {
-  if (layer === 'Sky') {
-    // No hits yet - not completed
-    if (this.layerState.Sky.hits.length === 0) return false;
-
-    // Regular FighterJet is 1 cell - 1 hit sinks it
-    // Check if player has an ExtraJet (from BlackBox powerup)
-    try {
-      const game = this.game || window.warZonesGame;
-      if (game && game.gameState && game.gameState.ships.player['ExtraJet']) {
-        const extraJet = game.gameState.ships.player['ExtraJet'];
-        if (!extraJet.isSunk && extraJet.positions.length > 0) {
-          // ExtraJet exists and isn't sunk yet - need 2 hits total
-          return this.layerState.Sky.hits.length >= 2;
-        }
+  // Primary check: inspect the actual player ship state so that sinking a
+  // ship (which clears this.layerState[layer].hits) doesn't cause the AI to
+  // think the layer is still in play.
+  try {
+    const game = this.game || window.warZonesGame;
+    if (game && game.gameState && game.gameState.ships && game.gameState.ships.player) {
+      const playerShips = game.gameState.ships.player;
+      const shipsInLayer = [];
+      for (const shipType in playerShips) {
+        const ship = playerShips[shipType];
+        if (!ship || !ship.positions || ship.positions.length === 0) continue;
+        let shipLayer = GAME_CONSTANTS.SHIPS[shipType] && GAME_CONSTANTS.SHIPS[shipType].layer;
+        if (!shipLayer && shipType === 'ExtraJet') shipLayer = 'Sky';
+        if (shipLayer === layer) shipsInLayer.push(ship);
       }
-    } catch (e) {
-      // Fallback - if we can't check, 1 hit is enough
+      // No ships placed on this layer at all → treat as completed so AI
+      // doesn't waste attacks there (covers reduced_fleet missions).
+      if (shipsInLayer.length === 0) return true;
+      return shipsInLayer.every(ship => ship.isSunk);
     }
+  } catch (e) {
+    // Fall through to legacy logic.
+  }
 
-    // No ExtraJet or ExtraJet already sunk - 1 hit completes sky
+  // Fallback: legacy hit-count logic (used if game state is unavailable).
+  if (layer === 'Sky') {
+    if (this.layerState.Sky.hits.length === 0) return false;
     return true;
   }
-  
-  // For other layers, use standard logic but exclude treasure chests
   const requiredHits = {
     Space: 4,  // 2x2 square ship
     Sky: 1,    // Single cell ship (handled above)
     Sea: 5,    // 3-cell + 2-cell ships
     Sub: 2     // 2-cell ship
   };
-  
-  // Count actual ship hits (not treasure chests)
   const shipHits = this.layerState[layer].hits.length;
-  
   return shipHits >= requiredHits[layer];
 }
   
@@ -5858,6 +5860,23 @@ class CampaignManager {
     if (!this.activeMission?.modifiers.includes('turn_timer')) return;
     this.modifierState.timerRemaining = this.modifierState.timerSeconds;
     this._showTimerUI();
+
+    // Snap the bar to full width immediately with no transition so the
+    // timer starts visually full the instant the player's turn begins
+    // (previously it animated from 0% → 100% over 1s which felt clunky).
+    const timerEl = document.getElementById('turnTimer');
+    if (timerEl) {
+      const bar = timerEl.querySelector('.turn-timer-bar');
+      if (bar) {
+        bar.style.transition = 'none';
+        bar.style.width = '100%';
+        // Force reflow so the no-transition width takes effect before
+        // the normal transition is re-enabled by _updateTimerDisplay.
+        void bar.offsetWidth;
+        bar.style.transition = '';
+      }
+    }
+
     this._updateTimerDisplay();
     this.modifierState.timerInterval = setInterval(() => {
       this.modifierState.timerRemaining--;
@@ -5872,6 +5891,17 @@ class CampaignManager {
   resetTurnTimer() {
     if (this.modifierState.timerInterval) {
       this.modifierState.timerRemaining = this.modifierState.timerSeconds;
+      // Snap back to full width without animation.
+      const timerEl = document.getElementById('turnTimer');
+      if (timerEl) {
+        const bar = timerEl.querySelector('.turn-timer-bar');
+        if (bar) {
+          bar.style.transition = 'none';
+          bar.style.width = '100%';
+          void bar.offsetWidth;
+          bar.style.transition = '';
+        }
+      }
       this._updateTimerDisplay();
     }
   }
