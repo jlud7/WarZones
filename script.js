@@ -6152,21 +6152,61 @@ class CampaignManager {
 }
 
 /* --- Network Manager --- */
+/**
+ * NetworkManager — Firebase Realtime Database signaling + messaging.
+ *
+ * Room layout in RTDB:
+ *   /rooms/{code}
+ *     /host        : { joinedAt }            (host presence)
+ *     /guest       : { joinedAt }            (guest presence, set by joiner)
+ *     /messages    : { autoId: { from, type, payload, ts } }  (append-only)
+ *     /createdAt
+ *
+ * Each client writes its own role into host/guest and listens to the other.
+ * All gameplay traffic (attacks, results, ship data, powerups) flows through
+ * /messages as short-lived records.
+ */
 class NetworkManager {
   constructor(game) {
     this.game = game;
-    this.peer = null;
-    this.conn = null;
     this.isHost = false;
     this.roomCode = null;
     this.isConnected = false;
+    this.clientId = Math.random().toString(36).slice(2, 10);
+
+    // Firebase refs (populated when a room is active)
+    this.db = null;
+    this.roomRef = null;
+    this.messagesRef = null;
+    this.messagesListener = null;
+    this.otherRoleListener = null;
+    this.hostDisconnectListener = null;
+
+    // Ping/latency tracking
     this.pingInterval = null;
     this.lastPingTime = null;
     this.currentPing = null;
+
+    // Track which message IDs we've already handled so reconnects don't replay
+    this.handledMessageIds = new Set();
+    // Only messages created after this timestamp are shown to the player
+    this.joinTimestamp = 0;
+  }
+
+  _getDb() {
+    if (!this.db) {
+      if (typeof firebase === 'undefined' || !firebase.database) {
+        console.error('Firebase SDK not loaded');
+        return null;
+      }
+      this.db = firebase.database();
+    }
+    return this.db;
   }
 
   generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars like 0/O, 1/I/L
+    // Exclude confusing chars: 0/O, 1/I/L, Q (looks like O)
+    const chars = 'ABCDEFGHJKLMNPRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 7; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -6198,9 +6238,9 @@ class NetworkManager {
   startPingLoop() {
     this.stopPingLoop();
     this.pingInterval = setInterval(() => {
-      if (this.conn && this.conn.open) {
+      if (this.isConnected) {
         this.lastPingTime = Date.now();
-        this.conn.send({ type: 'PING', timestamp: this.lastPingTime });
+        this.send({ type: 'PING', timestamp: this.lastPingTime });
       }
     }, 5000);
   }
@@ -6214,12 +6254,10 @@ class NetworkManager {
 
   handlePing(data) {
     if (data.type === 'PING') {
-      // Respond to ping
       this.send({ type: 'PONG', timestamp: data.timestamp });
       return true;
     }
     if (data.type === 'PONG') {
-      // Calculate round-trip time
       this.currentPing = Date.now() - data.timestamp;
       this.updateConnectionUI('connected', 'Connected');
       return true;
@@ -6227,92 +6265,141 @@ class NetworkManager {
     return false;
   }
 
-  initialize(customId = null) {
-    // Use custom ID if provided (for hosting), otherwise let PeerJS generate one
-    const peerId = customId || null;
+  /**
+   * Host a new room. `customId` is the room code generated via generateRoomCode().
+   */
+  async initialize(customId = null) {
+    const db = this._getDb();
+    if (!db) {
+      this.updateConnectionUI('disconnected', 'Firebase unavailable');
+      this.game.ui.updateCommentary('Firebase not loaded — check your internet connection.');
+      return;
+    }
 
     this.updateConnectionUI('connecting', 'Connecting...');
+    this.roomCode = customId || this.generateRoomCode();
+    this.roomRef = db.ref(`rooms/${this.roomCode}`);
+    this.messagesRef = this.roomRef.child('messages');
+    this.joinTimestamp = Date.now();
+    this.handledMessageIds.clear();
 
-    this.peer = new Peer(peerId, {
-      debug: 2
-    });
+    try {
+      // Host: create room, advertise presence, wait for a guest to join.
+      await this.roomRef.child('host').set({ joinedAt: firebase.database.ServerValue.TIMESTAMP, clientId: this.clientId });
+      await this.roomRef.child('createdAt').set(firebase.database.ServerValue.TIMESTAMP);
+      // Clean up the room when the host disconnects (tab close / navigate away)
+      this.roomRef.onDisconnect().remove();
 
-    this.peer.on('open', (id) => {
-      this.roomCode = id;
-      console.log('My peer ID is: ' + id);
-      if (this.isHost) {
-        this.game.ui.showRoomCode(id);
-        this.updateConnectionUI('connecting', 'Waiting for opponent...');
-      }
-    });
+      this.game.ui.showRoomCode(this.roomCode);
+      this.updateConnectionUI('connecting', 'Waiting for opponent...');
 
-    this.peer.on('connection', (conn) => {
-      this.handleConnection(conn);
-    });
-
-    this.peer.on('error', (err) => {
-      console.error('PeerJS error:', err);
-      const errorMessages = {
-        'browser-incompatible': 'Your browser does not support WebRTC.',
-        'disconnected': 'Connection to the server was lost.',
-        'invalid-id': 'The room code is invalid.',
-        'invalid-key': 'API key error. Please try again.',
-        'network': 'Network error. Check your internet connection.',
-        'peer-unavailable': 'Room not found. Check the room code and try again.',
-        'ssl-unavailable': 'Secure connection not available.',
-        'server-error': 'Server error. Please try again later.',
-        'socket-error': 'Connection error. Please try again.',
-        'socket-closed': 'Connection was closed unexpectedly.',
-        'unavailable-id': 'Room code already in use. Try again.',
-        'webrtc': 'WebRTC error. Please try a different browser.'
-      };
-      const message = errorMessages[err.type] || `Connection error: ${err.type}`;
+      // Listen for a guest to appear
+      this.otherRoleListener = this.roomRef.child('guest').on('value', (snap) => {
+        if (snap.exists() && !this.isConnected) {
+          this._onRoomPaired();
+        }
+      });
+    } catch (err) {
+      console.error('Failed to initialize room:', err);
       this.updateConnectionUI('disconnected', 'Error');
-      this.game.ui.updateCommentary(message);
+      this.game.ui.updateCommentary('Could not create room. Check your internet connection.');
       setTimeout(() => {
         this.hideConnectionUI();
         this.game.ui.showMainMenu();
-      }, 2000);
-    });
+      }, 2500);
+    }
   }
 
-  connect(remoteId) {
-    if (!this.peer) this.initialize();
-
-    // Close existing connection if any
-    if (this.conn) {
-      this.conn.close();
+  /**
+   * Join an existing room by code.
+   */
+  async connect(remoteId) {
+    const db = this._getDb();
+    if (!db) {
+      this.updateConnectionUI('disconnected', 'Firebase unavailable');
+      this.game.ui.updateCommentary('Firebase not loaded — check your internet connection.');
+      return;
     }
 
     this.updateConnectionUI('connecting', 'Joining...');
-    console.log('Connecting to ' + remoteId);
-    const conn = this.peer.connect(remoteId);
-    this.handleConnection(conn);
+    this.roomCode = remoteId;
+    this.roomRef = db.ref(`rooms/${this.roomCode}`);
+    this.messagesRef = this.roomRef.child('messages');
+    this.joinTimestamp = Date.now();
+    this.handledMessageIds.clear();
+
+    try {
+      // Verify host exists before joining
+      const hostSnap = await this.roomRef.child('host').get();
+      if (!hostSnap.exists()) {
+        this.updateConnectionUI('disconnected', 'Room not found');
+        this.game.ui.updateCommentary('Room not found. Check the room code and try again.');
+        setTimeout(() => {
+          this.hideConnectionUI();
+          this.game.ui.showMainMenu();
+        }, 2500);
+        this.roomRef = null;
+        return;
+      }
+
+      // Join as guest
+      await this.roomRef.child('guest').set({ joinedAt: firebase.database.ServerValue.TIMESTAMP, clientId: this.clientId });
+      // Guest cleans up its own presence on disconnect
+      this.roomRef.child('guest').onDisconnect().remove();
+
+      // Watch for host disappearing (they closed the tab)
+      this.otherRoleListener = this.roomRef.child('host').on('value', (snap) => {
+        if (!snap.exists() && this.isConnected) {
+          this._onOpponentLeft();
+        }
+      });
+
+      this._onRoomPaired();
+    } catch (err) {
+      console.error('Failed to join room:', err);
+      this.updateConnectionUI('disconnected', 'Error');
+      this.game.ui.updateCommentary('Could not join room. Check your internet connection.');
+      setTimeout(() => {
+        this.hideConnectionUI();
+        this.game.ui.showMainMenu();
+      }, 2500);
+    }
   }
 
-  handleConnection(conn) {
-    this.conn = conn;
+  /**
+   * Called once both host and guest are present. Wires up the message
+   * listener and notifies the game that a peer has connected.
+   */
+  _onRoomPaired() {
+    if (this.isConnected) return;
+    this.isConnected = true;
+    this.updateConnectionUI('connected', 'Connected');
 
-    const handleOpen = () => {
-      // Prevent double-calling if already connected
-      if (this.isConnected) return;
-
-      console.log('Connected to: ' + conn.peer);
-      this.isConnected = true;
-      this.updateConnectionUI('connected', 'Connected');
-      this.startPingLoop();
-      this.game.onPeerConnected(this.isHost);
-    };
-
-    // Set up the 'open' event handler
-    this.conn.on('open', handleOpen);
-
-    // Check if the connection is already open (event may have already fired)
-    if (this.conn.open) {
-      handleOpen();
+    // If I'm the host, also watch for the guest leaving unexpectedly
+    if (this.isHost) {
+      this.hostDisconnectListener = this.roomRef.child('guest').on('value', (snap) => {
+        if (!snap.exists() && this.isConnected) {
+          this._onOpponentLeft();
+        }
+      });
     }
 
-    this.conn.on('data', (data) => {
+    // Listen for new messages (append-only log). Filter out our own
+    // messages and anything timestamped before we joined.
+    this.messagesListener = this.messagesRef.on('child_added', (snap) => {
+      const msg = snap.val();
+      const id = snap.key;
+      if (!msg || this.handledMessageIds.has(id)) return;
+      this.handledMessageIds.add(id);
+
+      // Skip our own messages
+      if (msg.from === this.clientId) return;
+      // Skip stale messages from before we joined
+      if (typeof msg.ts === 'number' && msg.ts < this.joinTimestamp - 1000) return;
+
+      const data = msg.payload;
+      if (!data) return;
+
       // Handle ping/pong internally
       if (this.handlePing(data)) return;
 
@@ -6320,51 +6407,91 @@ class NetworkManager {
       this.game.handlePeerData(data);
     });
 
-    this.conn.on('close', () => {
-      console.log('Connection closed');
-      this.isConnected = false;
-      this.stopPingLoop();
-      this.updateConnectionUI('disconnected', 'Disconnected');
+    this.startPingLoop();
+    this.game.onPeerConnected(this.isHost);
+  }
 
-      // Only show alert/redirect if game is still in progress
-      if (this.game.gameState.phase !== 'gameOver') {
-        this.game.ui.updateCommentary('Opponent disconnected!');
-        setTimeout(() => {
-          this.hideConnectionUI();
-          this.game.ui.showMainMenu();
-        }, 2000);
-      }
-    });
+  _onOpponentLeft() {
+    if (!this.isConnected) return;
+    this.isConnected = false;
+    this.stopPingLoop();
+    this.updateConnectionUI('disconnected', 'Disconnected');
 
-    this.conn.on('error', (err) => {
-      console.error('Connection error:', err);
+    if (this.game.gameState.phase !== 'gameOver') {
+      this.game.ui.updateCommentary('Opponent disconnected!');
+      setTimeout(() => {
+        this.hideConnectionUI();
+        this.game.ui.showMainMenu();
+      }, 2000);
+    }
+  }
+
+  /**
+   * Push a message into the room's /messages log. All clients except the
+   * sender will receive it via the child_added listener.
+   */
+  send(data) {
+    if (!this.messagesRef || !this.isConnected) {
+      console.error('Room not open, cannot send data');
+      return;
+    }
+    this.messagesRef.push({
+      from: this.clientId,
+      type: data.type,
+      payload: data,
+      ts: firebase.database.ServerValue.TIMESTAMP
+    }).catch(err => {
+      console.error('Failed to send message:', err);
       this.updateConnectionUI('disconnected', 'Error');
     });
   }
 
-  send(data) {
-    if (this.conn && this.conn.open) {
-      this.conn.send(data);
-    } else {
-      console.error('Connection not open, cannot send data');
-      this.updateConnectionUI('disconnected', 'Disconnected');
-    }
-  }
-
+  /**
+   * Tear down all listeners and remove our presence from the room.
+   * The host removes the entire room; the guest only removes its own node.
+   */
   reset() {
     this.stopPingLoop();
-    if (this.conn) {
-      this.conn.close();
+
+    // Detach listeners
+    if (this.messagesRef && this.messagesListener) {
+      this.messagesRef.off('child_added', this.messagesListener);
     }
-    if (this.peer) {
-      this.peer.destroy();
+    if (this.roomRef && this.otherRoleListener) {
+      const otherRole = this.isHost ? 'guest' : 'host';
+      this.roomRef.child(otherRole).off('value', this.otherRoleListener);
     }
-    this.peer = null;
-    this.conn = null;
+    if (this.roomRef && this.hostDisconnectListener) {
+      this.roomRef.child('guest').off('value', this.hostDisconnectListener);
+    }
+
+    // Clear presence
+    if (this.roomRef) {
+      try {
+        if (this.isHost) {
+          // Host wipes the whole room
+          this.roomRef.remove().catch(() => {});
+          this.roomRef.onDisconnect().cancel().catch(() => {});
+        } else {
+          // Guest only wipes its own node
+          this.roomRef.child('guest').remove().catch(() => {});
+          this.roomRef.child('guest').onDisconnect().cancel().catch(() => {});
+        }
+      } catch (e) {
+        console.warn('Error cleaning up room:', e);
+      }
+    }
+
+    this.roomRef = null;
+    this.messagesRef = null;
+    this.messagesListener = null;
+    this.otherRoleListener = null;
+    this.hostDisconnectListener = null;
     this.isHost = false;
     this.roomCode = null;
     this.isConnected = false;
     this.currentPing = null;
+    this.handledMessageIds.clear();
     this.hideConnectionUI();
   }
 }
