@@ -1700,39 +1700,59 @@ startNewGame(mode) {
 
   handlePeerData(data) {
     console.log('Processing peer data:', data);
-    switch(data.type) {
-      case 'SHIPS_READY':
-        this.gameState.opponentReady = true;
-        this.loadOpponentShips(data.ships);
-        
-        if (this.gameState.isPlacementComplete()) {
-           this.startOnlineCombat();
-        } else {
-           this.ui.updateCommentary("Opponent is ready. Finish placing your ships!");
-        }
-        break;
-      case 'ATTACK':
-        this.handleIncomingAttack(data);
-        break;
-      case 'ATTACK_RESULT':
-        this.handleAttackResult(data);
-        break;
-      case 'POWERUP_USED':
-        // Opponent activated a powerup - show notification
-        this.showPowerupNotification(data.powerup, true);
-        break;
+    // Wrap each handler in a try/catch so a silent crash (e.g. an
+    // unexpected undefined field from Firebase stripping) can't leave
+    // isProcessingTurn stuck true and freeze the turn flow.
+    try {
+      switch(data.type) {
+        case 'SHIPS_READY':
+          this.gameState.opponentReady = true;
+          this.loadOpponentShips(data.ships);
+
+          if (this.gameState.isPlacementComplete()) {
+             this.startOnlineCombat();
+          } else {
+             this.ui.updateCommentary("Opponent is ready. Finish placing your ships!");
+          }
+          break;
+        case 'ATTACK':
+          this.handleIncomingAttack(data);
+          break;
+        case 'ATTACK_RESULT':
+          this.handleAttackResult(data);
+          break;
+        case 'POWERUP_USED':
+          // Opponent activated a powerup - show notification
+          this.showPowerupNotification(data.powerup, true);
+          break;
+      }
+    } catch (err) {
+      console.error('Error handling peer data:', err, 'data:', data);
+      // Never leave the click-guard locked if a handler blew up
+      this.isProcessingTurn = false;
     }
   }
 
   loadOpponentShips(shipsData) {
-      this.gameState.ships.opponent = shipsData;
-      // Reconstruct board grid from ships for opponent (so we can check hits later if needed, though we rely on them mostly)
-      // Actually, we should probably trust the result they send back, but keeping state synced is good.
-      // However, we CANNOT put the ships on the board visibly.
-      
+      // Firebase RTDB strips empty arrays/objects on write, so by the time
+      // the opponent's ships reach us the `hits: []` field has disappeared
+      // from every ship. Rehydrate missing fields before using them or a
+      // later `ship.hits.includes(...)` call in handleAttackResult() will
+      // throw and silently kill the turn flow.
+      const normalized = {};
+      Object.entries(shipsData || {}).forEach(([shipName, ship]) => {
+        normalized[shipName] = {
+          positions: Array.isArray(ship?.positions) ? ship.positions.slice() : [],
+          hits: Array.isArray(ship?.hits) ? ship.hits.slice() : [],
+          isSunk: !!ship?.isSunk
+        };
+      });
+      this.gameState.ships.opponent = normalized;
+
       this.gameState.boards.opponent = this.gameState.createEmptyBoards();
-      
-      Object.entries(shipsData).forEach(([shipName, ship]) => {
+
+      Object.entries(normalized).forEach(([shipName, ship]) => {
+         if (!GAME_CONSTANTS.SHIPS[shipName]) return;
          const layer = GAME_CONSTANTS.SHIPS[shipName].layer;
          ship.positions.forEach(pos => {
              this.gameState.boards.opponent[layer][pos] = shipName;
@@ -1807,24 +1827,32 @@ startNewGame(mode) {
 
   handleAttackResult(data) {
     // I attacked, here is the result
-    const result = data.result;
+    const result = data && data.result;
+    if (!result) {
+      console.warn('handleAttackResult called without a result object', data);
+      this.isProcessingTurn = false;
+      return;
+    }
 
     // Track my hit locally
     if (result.hit) {
       this.gameState.shots.player.hits++;
     }
 
-    // Use updateBoard but map boardId to opponent
-    result.boardId = result.boardId.replace('player', 'opponent'); // Transform ID
+    // Use updateBoard but map boardId to opponent (guard against missing boardId)
+    if (typeof result.boardId === 'string') {
+      result.boardId = result.boardId.replace('player', 'opponent');
+    }
 
-    // CRITICAL: Update local ship state for win condition detection
+    // CRITICAL: Update local ship state for win condition detection.
+    // ship.hits may be missing here if Firebase stripped an empty array
+    // during SHIPS_READY delivery — defensively re-initialize it.
     if (result.hit && result.shipType && this.gameState.ships.opponent[result.shipType]) {
       const ship = this.gameState.ships.opponent[result.shipType];
-      // Add the hit position if not already tracked
+      if (!Array.isArray(ship.hits)) ship.hits = [];
       if (!ship.hits.includes(result.index)) {
         ship.hits.push(result.index);
       }
-      // Mark ship as sunk if result says it's sunk
       if (result.sunk) {
         ship.isSunk = true;
       }
@@ -1834,17 +1862,18 @@ startNewGame(mode) {
     this.sound.playSound(result.hit ? 'hit' : 'miss');
     if (result.sunk) this.sound.playSound('sunk');
 
-    // Check game over locally as well (in case remote result is incorrect)
+    // Check game over locally as well (in case remote result is incorrect).
+    // Guard against missing/weird gameOver object from Firebase round-trip.
     const localGameOver = this.gameState.checkGameOver();
-    const isGameOver = result.gameOver.isOver || localGameOver.isOver;
+    const remoteIsOver = !!(result.gameOver && result.gameOver.isOver);
+    const isGameOver = remoteIsOver || localGameOver.isOver;
 
     if (isGameOver) {
        // I won - I destroyed all opponent's ships
        this.gameState.phase = 'gameOver';
        this.isProcessingTurn = false;
-       // Adjust winner for online mode display
        const gameOverResult = {
-         ...result.gameOver,
+         ...(result.gameOver || {}),
          isOver: true,
          winner: 'player', // I won
          mode: 'online'
@@ -6450,6 +6479,34 @@ class NetworkManager {
   }
 
   /**
+   * Recursively strip `undefined` values from an outgoing payload.
+   * Firebase's push() REJECTS any object containing undefined, which
+   * would abort the send and drop the message. Also replaces NaN /
+   * Infinity with null so those don't cause deserialization surprises.
+   * Empty arrays and empty objects are left as-is — Firebase will drop
+   * them, but the receivers are responsible for rehydrating defaults.
+   */
+  _sanitize(value) {
+    if (value === undefined) return null;
+    if (value === null) return null;
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (Array.isArray(value)) {
+      return value.map(v => this._sanitize(v));
+    }
+    if (typeof value === 'object') {
+      const out = {};
+      for (const key of Object.keys(value)) {
+        const v = this._sanitize(value[key]);
+        if (v !== undefined) out[key] = v;
+      }
+      return out;
+    }
+    return value;
+  }
+
+  /**
    * Push a message into the room's /messages log. All clients except the
    * sender will receive it via the child_added listener.
    */
@@ -6458,13 +6515,15 @@ class NetworkManager {
       console.error('Room not open, cannot send data');
       return;
     }
+    const payload = this._sanitize(data);
+    console.log('Sending data:', payload);
     this.messagesRef.push({
       from: this.clientId,
       type: data.type,
-      payload: data,
+      payload: payload,
       ts: firebase.database.ServerValue.TIMESTAMP
     }).catch(err => {
-      console.error('Failed to send message:', err);
+      console.error('Failed to send message:', err, 'payload:', payload);
       this.updateConnectionUI('disconnected', 'Error');
     });
   }
