@@ -129,15 +129,25 @@ activateBlackBox() {
     
     // Add to player ships
     if (!this.gameState.ships.player['ExtraJet']) {
-      this.gameState.ships.player['ExtraJet'] = { 
-        positions: [index], 
-        hits: [], 
-        isSunk: false 
+      this.gameState.ships.player['ExtraJet'] = {
+        positions: [index],
+        hits: [],
+        isSunk: false
       };
     } else {
       this.gameState.ships.player['ExtraJet'].positions.push(index);
     }
-    
+
+    // Online mode: tell the opponent about the new ship so their local
+    // ships.opponent tracking stays in sync (needed for win-condition
+    // checks and for processAttack to register hits on ExtraJet).
+    if (this.gameState.gameMode === 'online' && this.network.isConnected) {
+      this.network.send({
+        type: 'EXTRA_JET_PLACED',
+        position: index
+      });
+    }
+
     // Update UI
     e.target.classList.add('ship');
     e.target.textContent = GAME_CONSTANTS.SHIPS.FighterJet.symbol;
@@ -276,7 +286,22 @@ activateKryptonLaser() {
   // Function to perform the attack on all layers
   function processKryptonLaserAttack(index) {
     console.log(`Processing Krypton Laser attack at index ${index}`);
-    
+
+    // Online mode: send the laser attack to the opponent over the network.
+    // Their client will process the attack against their authoritative
+    // boards.player state, then reply with a LASER_RESULT message that
+    // our handleLaserResult() applies to our local view.
+    if (game.gameState.gameMode === 'online') {
+      game.ui.updateCommentary('Firing Krypton Laser...');
+      game.animateCommentaryBox();
+      game.network.send({
+        type: 'LASER_ATTACK',
+        index: index
+      });
+      // isProcessingTurn stays true until LASER_RESULT arrives.
+      return;
+    }
+
     const results = [];
     let hitCount = 0;
     let sunkCount = 0;
@@ -454,24 +479,40 @@ activateCannonBall() {
   // Handle the attack
   const cannonAttack = (e) => {
     if (!e.target.classList.contains('cell')) return;
-    
+
     // Don't allow attack if already processing a turn
     if (this.isProcessingTurn) return;
-    
+
     // Set the processing flag
     this.isProcessingTurn = true;
-    
+
     // IMPORTANT: Store the fact that we're using a cannonball
     const isUsingCannonball = true;
-    
+
     // Immediately clear the pendingPowerup flag to prevent recursive activation
     this.gameState.pendingPowerup = null;
-    
+
     // Clean up hover events immediately
     cleanupEventHandlers();
-    
+
     // Get the target area (2×2 grid)
     const index = parseInt(e.target.dataset.index);
+
+    // Online mode: send the cannon-ball attack to the opponent and wait
+    // for their CANNONBALL_RESULT. Restore the normal handleAttack
+    // binding before returning — the monkey-patch below is only needed
+    // while local targeting is active.
+    if (this.gameState.gameMode === 'online') {
+      this.ui.updateCommentary('Firing Cannon Ball...');
+      this.animateCommentaryBox();
+      this.network.send({
+        type: 'CANNONBALL_ATTACK',
+        index: index
+      });
+      // isProcessingTurn stays true until CANNONBALL_RESULT arrives.
+      return;
+    }
+
     const row = Math.floor(index / GAME_CONSTANTS.BOARD_SIZE);
     const col = index % GAME_CONSTANTS.BOARD_SIZE;
     
@@ -1725,6 +1766,33 @@ startNewGame(mode) {
           // Opponent activated a powerup - show notification
           this.showPowerupNotification(data.powerup, true);
           break;
+        case 'EXTRA_JET_PLACED':
+          // Opponent used BlackBox and placed an extra jet on their own
+          // Sky board. Mirror it in our ships.opponent tracking so we
+          // can register hits on it and count it for win conditions.
+          this.handleExtraJetPlaced(data);
+          break;
+        case 'LASER_ATTACK':
+          // Opponent fired their Krypton Laser at a position across all
+          // four of our layers. Process each attack on our authoritative
+          // state and ship the results back.
+          this.handleIncomingLaser(data);
+          break;
+        case 'LASER_RESULT':
+          // Our Krypton Laser just finished on the opponent's side —
+          // apply the result array to our local view.
+          this.handleLaserResult(data);
+          break;
+        case 'CANNONBALL_ATTACK':
+          // Opponent fired their Cannon Ball at a 2×2 area on our Sea
+          // board. Process each valid cell and ship the results back.
+          this.handleIncomingCannonBall(data);
+          break;
+        case 'CANNONBALL_RESULT':
+          // Our Cannon Ball just finished on the opponent's side — apply
+          // the result array to our local view.
+          this.handleCannonBallResult(data);
+          break;
       }
     } catch (err) {
       console.error('Error handling peer data:', err, 'data:', data);
@@ -1898,6 +1966,353 @@ startNewGame(mode) {
        this.ui.updateCommentary("You missed! Opponent's Turn - Wait...");
        this.isProcessingTurn = false;
     }
+  }
+
+  // ========== Online Powerup Handlers ==========
+  // These mirror the AI/human powerup flows but route attacks through the
+  // network so both clients stay in sync. Each powerup has an "incoming"
+  // handler (opponent fired at me) and, for attack powerups, a "result"
+  // handler (my powerup finished on the opponent's side).
+
+  /**
+   * Opponent placed an ExtraJet (BlackBox powerup). Mirror it in our
+   * tracking state so future attacks on that Sky cell register as ship
+   * hits and our win-condition check accounts for the extra ship.
+   */
+  handleExtraJetPlaced(data) {
+    const position = data && data.position;
+    if (typeof position !== 'number') return;
+
+    if (!this.gameState.ships.opponent['ExtraJet']) {
+      this.gameState.ships.opponent['ExtraJet'] = {
+        positions: [position],
+        hits: [],
+        isSunk: false
+      };
+    } else {
+      if (!this.gameState.ships.opponent['ExtraJet'].positions.includes(position)) {
+        this.gameState.ships.opponent['ExtraJet'].positions.push(position);
+      }
+    }
+    // Mirror on opponent's Sky board so attack-tracking stays consistent
+    // (ships are hidden visually in online mode, so nothing visible
+    // changes for us).
+    this.gameState.boards.opponent.Sky[position] = 'ExtraJet';
+
+    this.showPowerupNotification('BlackBox', true);
+    this.ui.updateCommentary('Opponent deployed an extra fighter jet!');
+    this.animateCommentaryBox();
+  }
+
+  /**
+   * Opponent fired their Krypton Laser at a position across all four of
+   * our layers. Process each attack against our authoritative state and
+   * ship the results back so they can update their UI.
+   */
+  handleIncomingLaser(data) {
+    const index = data && data.index;
+    if (typeof index !== 'number') return;
+
+    const results = [];
+    GAME_CONSTANTS.LAYERS.forEach((layer) => {
+      const cellState = this.gameState.boards.player[layer][index];
+      if (cellState === 'hit' || cellState === 'miss') return;
+      const boardId = `player${layer}Board`;
+      const result = this.gameState.processAttack(boardId, index, layer);
+      results.push(result);
+      this.ui.updateBoard(result);
+      if (result.hit) {
+        const cell = document.querySelector(`#${boardId} .cell[data-index="${index}"]`);
+        if (cell) this.animations.playExplosion(cell);
+      }
+    });
+
+    this.sound.playSound(results.some(r => r.hit) ? 'hit' : 'miss');
+    this.animations.playScreenShake(results.some(r => r.sunk));
+    this.ui.updateScoreBoard();
+
+    // Send results back to the attacker.
+    this.network.send({
+      type: 'LASER_RESULT',
+      results: results
+    });
+
+    const hitCount = results.filter(r => r.hit).length;
+    const sunkCount = results.filter(r => r.sunk).length;
+
+    let msg = hitCount > 0
+      ? `Opponent's Krypton Laser hit ${hitCount} target${hitCount !== 1 ? 's' : ''}`
+      : "Opponent's Krypton Laser missed all targets!";
+    if (sunkCount > 0) msg += ` and sunk ${sunkCount} ship${sunkCount !== 1 ? 's' : ''}!`;
+    else if (hitCount > 0) msg += '!';
+    this.ui.updateCommentary(msg);
+    this.animateCommentaryBox();
+
+    // Check game over
+    const gameOverResult = results.find(r => r.gameOver && r.gameOver.isOver);
+    if (gameOverResult) {
+      this.gameState.phase = 'gameOver';
+      this.isProcessingTurn = false;
+      this.ui.showGameOver({
+        ...gameOverResult.gameOver,
+        winner: 'opponent',
+        mode: 'online'
+      });
+      return;
+    }
+
+    // Turn flow: if opponent hit anything, their turn continues (we
+    // wait). If they missed everything, the turn comes back to us.
+    if (hitCount === 0 && results.length > 0) {
+      this.gameState.currentTurn = this.gameState.myPlayerId;
+      this.ui.updateCommentary('Your turn!');
+    }
+  }
+
+  /**
+   * Our Krypton Laser landed on the opponent's side — they shipped back
+   * the per-layer results. Apply them to our local view, update ship
+   * tracking, and handle turn flow.
+   */
+  handleLaserResult(data) {
+    const results = data && data.results;
+    if (!Array.isArray(results) || results.length === 0) {
+      // No valid cells were attacked — nothing to do, release the lock.
+      this.isProcessingTurn = false;
+      this.ui.updateCommentary('No valid targets for Krypton Laser!');
+      return;
+    }
+
+    let hitCount = 0;
+    let sunkCount = 0;
+
+    results.forEach((result) => {
+      if (!result) return;
+      this.gameState.shots.player.total++;
+      if (result.hit) {
+        this.gameState.shots.player.hits++;
+        hitCount++;
+        if (result.sunk) sunkCount++;
+      }
+
+      // Update local opponent ship tracking for win condition.
+      if (result.hit && result.shipType && this.gameState.ships.opponent[result.shipType]) {
+        const ship = this.gameState.ships.opponent[result.shipType];
+        if (!Array.isArray(ship.hits)) ship.hits = [];
+        if (!ship.hits.includes(result.index)) ship.hits.push(result.index);
+        if (result.sunk) ship.isSunk = true;
+      }
+
+      // Paint it on our view of the opponent's boards.
+      const displayResult = { ...result };
+      if (typeof displayResult.boardId === 'string') {
+        displayResult.boardId = displayResult.boardId.replace('player', 'opponent');
+      }
+      this.ui.updateBoard(displayResult);
+
+      const cell = document.querySelector(`#${displayResult.boardId} .cell[data-index="${displayResult.index}"]`);
+      if (cell) {
+        if (result.hit) this.animations.playExplosion(cell);
+        else this.animations.playSplash(cell);
+      }
+    });
+
+    if (hitCount > 0) {
+      this.sound.playSound('hit');
+      this.animations.playScreenShake(sunkCount > 0);
+    } else {
+      this.sound.playSound('miss');
+    }
+
+    this.ui.updateScoreBoard();
+
+    let msg;
+    if (hitCount > 0) {
+      msg = `Krypton Laser hit ${hitCount} target${hitCount !== 1 ? 's' : ''}`;
+      if (sunkCount > 0) msg += ` and sunk ${sunkCount} ship${sunkCount !== 1 ? 's' : ''}`;
+      msg += '! Your turn continues.';
+    } else {
+      msg = 'Krypton Laser missed all targets! Opponent\'s turn.';
+    }
+    this.ui.updateCommentary(msg);
+    this.animateCommentaryBox();
+
+    // Check game over — both remote and locally computed.
+    const localGameOver = this.gameState.checkGameOver();
+    const remoteGameOver = results.some(r => r && r.gameOver && r.gameOver.isOver);
+    if (remoteGameOver || localGameOver.isOver) {
+      this.gameState.phase = 'gameOver';
+      this.isProcessingTurn = false;
+      this.ui.showGameOver({ isOver: true, winner: 'player', mode: 'online' });
+      return;
+    }
+
+    // Turn flow: hit → stay; miss everything → flip to opponent.
+    if (hitCount === 0) {
+      this.gameState.currentTurn = this.gameState.myPlayerId === 1 ? 2 : 1;
+    }
+    this.isProcessingTurn = false;
+  }
+
+  /**
+   * Opponent fired their Cannon Ball at a 2×2 area on our Sea board.
+   * Process each valid cell and ship the results back.
+   */
+  handleIncomingCannonBall(data) {
+    const index = data && data.index;
+    if (typeof index !== 'number') return;
+
+    const boardSize = GAME_CONSTANTS.BOARD_SIZE;
+    const row = Math.floor(index / boardSize);
+    const col = index % boardSize;
+
+    const attackPositions = [];
+    for (let r = row; r < row + 2 && r < boardSize; r++) {
+      for (let c = col; c < col + 2 && c < boardSize; c++) {
+        attackPositions.push(r * boardSize + c);
+      }
+    }
+
+    const results = [];
+    attackPositions.forEach((targetIndex) => {
+      const cellState = this.gameState.boards.player.Sea[targetIndex];
+      if (cellState === 'hit' || cellState === 'miss') return;
+      const result = this.gameState.processAttack('playerSeaBoard', targetIndex, 'Sea');
+      results.push(result);
+      this.ui.updateBoard(result);
+      if (result.hit) {
+        const cell = document.querySelector(`#playerSeaBoard .cell[data-index="${targetIndex}"]`);
+        if (cell) this.animations.playExplosion(cell);
+      } else {
+        const cell = document.querySelector(`#playerSeaBoard .cell[data-index="${targetIndex}"]`);
+        if (cell) this.animations.playSplash(cell);
+      }
+    });
+
+    this.sound.playSound(results.some(r => r.hit) ? 'hit' : 'miss');
+    this.animations.playScreenShake(results.some(r => r.sunk));
+    this.ui.updateScoreBoard();
+
+    this.network.send({
+      type: 'CANNONBALL_RESULT',
+      results: results
+    });
+
+    const hitCount = results.filter(r => r.hit).length;
+    const sunkCount = results.filter(r => r.sunk).length;
+
+    let msg;
+    if (hitCount > 0) {
+      msg = `Opponent's Cannon Ball hit ${hitCount} target${hitCount !== 1 ? 's' : ''}`;
+      if (sunkCount > 0) msg += ` and sunk ${sunkCount} ship${sunkCount !== 1 ? 's' : ''}`;
+      msg += '!';
+    } else if (results.length > 0) {
+      msg = "Opponent's Cannon Ball missed all targets!";
+    } else {
+      msg = "Opponent's Cannon Ball found no valid targets.";
+    }
+    this.ui.updateCommentary(msg);
+    this.animateCommentaryBox();
+
+    // Check game over
+    const gameOverResult = results.find(r => r.gameOver && r.gameOver.isOver);
+    if (gameOverResult) {
+      this.gameState.phase = 'gameOver';
+      this.isProcessingTurn = false;
+      this.ui.showGameOver({
+        ...gameOverResult.gameOver,
+        winner: 'opponent',
+        mode: 'online'
+      });
+      return;
+    }
+
+    // Turn flow: if opponent hit anything, their turn continues. If all
+    // miss (or no valid cells), turn comes back to us.
+    if (hitCount === 0) {
+      this.gameState.currentTurn = this.gameState.myPlayerId;
+      this.ui.updateCommentary('Your turn!');
+    }
+  }
+
+  /**
+   * Our Cannon Ball result from the opponent — apply to local view.
+   */
+  handleCannonBallResult(data) {
+    const results = data && data.results;
+    if (!Array.isArray(results) || results.length === 0) {
+      this.isProcessingTurn = false;
+      this.ui.updateCommentary('No valid targets for Cannon Ball!');
+      return;
+    }
+
+    let hitCount = 0;
+    let sunkCount = 0;
+
+    results.forEach((result) => {
+      if (!result) return;
+      this.gameState.shots.player.total++;
+      if (result.hit) {
+        this.gameState.shots.player.hits++;
+        hitCount++;
+        if (result.sunk) sunkCount++;
+      }
+
+      if (result.hit && result.shipType && this.gameState.ships.opponent[result.shipType]) {
+        const ship = this.gameState.ships.opponent[result.shipType];
+        if (!Array.isArray(ship.hits)) ship.hits = [];
+        if (!ship.hits.includes(result.index)) ship.hits.push(result.index);
+        if (result.sunk) ship.isSunk = true;
+      }
+
+      const displayResult = { ...result };
+      if (typeof displayResult.boardId === 'string') {
+        displayResult.boardId = displayResult.boardId.replace('player', 'opponent');
+      }
+      this.ui.updateBoard(displayResult);
+
+      const cell = document.querySelector(`#${displayResult.boardId} .cell[data-index="${displayResult.index}"]`);
+      if (cell) {
+        if (result.hit) this.animations.playExplosion(cell);
+        else this.animations.playSplash(cell);
+      }
+    });
+
+    if (hitCount > 0) {
+      this.sound.playSound('hit');
+      this.animations.playScreenShake(sunkCount > 0);
+    } else {
+      this.sound.playSound('miss');
+    }
+
+    this.ui.updateScoreBoard();
+
+    let msg;
+    if (hitCount > 0) {
+      msg = `Cannon Ball hit ${hitCount} target${hitCount !== 1 ? 's' : ''}`;
+      if (sunkCount > 0) msg += ` and sunk ${sunkCount} ship${sunkCount !== 1 ? 's' : ''}`;
+      msg += '! Your turn continues.';
+    } else {
+      msg = "Cannon Ball missed all targets! Opponent's turn.";
+    }
+    this.ui.updateCommentary(msg);
+    this.animateCommentaryBox();
+
+    // Check game over
+    const localGameOver = this.gameState.checkGameOver();
+    const remoteGameOver = results.some(r => r && r.gameOver && r.gameOver.isOver);
+    if (remoteGameOver || localGameOver.isOver) {
+      this.gameState.phase = 'gameOver';
+      this.isProcessingTurn = false;
+      this.ui.showGameOver({ isOver: true, winner: 'player', mode: 'online' });
+      return;
+    }
+
+    // Turn flow
+    if (hitCount === 0) {
+      this.gameState.currentTurn = this.gameState.myPlayerId === 1 ? 2 : 1;
+    }
+    this.isProcessingTurn = false;
   }
 
   handleShipPlacement(boardId, index, layer) {
@@ -2127,6 +2542,11 @@ _initCombat() {
   handleAttack(e) {
     // Early exit if not in combat phase or already processing a turn
     if (this.gameState.phase !== 'combat' || this.isProcessingTurn) return;
+
+    // If a powerup is waiting for a click, let its own handler take it —
+    // don't also fire a regular attack. (The non-online branch below has
+    // the same guard; this mirrors it for online mode.)
+    if (this.gameState.pendingPowerup) return;
 
     // Online mode logic
     if (this.gameState.gameMode === 'online') {
