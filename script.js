@@ -822,12 +822,26 @@ aiUseKryptonLaser() {
   const boardSize = GAME_CONSTANTS.BOARD_SIZE;
   let targetIndex = -1;
 
+  // Only consider layers where the player still has ships to hunt. This
+  // prevents wasted laser shots on layers stripped by reduced_fleet
+  // missions (e.g. Kraken removes the player's Submarine, so the Sub
+  // layer has no valid targets).
+  const layersToAttack = GAME_CONSTANTS.LAYERS.filter(layer => !this.ai.shipCompleted(layer));
+
+  // If every layer is exhausted the game should already be over; bail
+  // out defensively rather than firing the laser into empty space.
+  if (layersToAttack.length === 0) {
+    this.ui.updateCommentary("AI used Krypton Laser but had no valid targets!");
+    return;
+  }
+
   // Try to find a strategic position - look for unattacked positions
+  // in the layers we actually plan to attack.
   const allUnattacked = [];
   for (let i = 0; i < boardSize * boardSize; i++) {
-    // Check if this position has unattacked cells in any layer
+    // Check if this position has unattacked cells in any attackable layer
     let hasUnattacked = false;
-    for (const layer of GAME_CONSTANTS.LAYERS) {
+    for (const layer of layersToAttack) {
       if (!this.ai.attackedPositions[layer].has(i)) {
         hasUnattacked = true;
         break;
@@ -844,12 +858,12 @@ aiUseKryptonLaser() {
     targetIndex = Math.floor(Math.random() * boardSize * boardSize);
   }
 
-  // Attack the same position across all layers
+  // Attack the same position across all attackable layers
   let hitCount = 0;
   let sunkCount = 0;
   const results = [];
 
-  GAME_CONSTANTS.LAYERS.forEach(layer => {
+  layersToAttack.forEach(layer => {
     const boardId = `player${layer}Board`;
 
     // Skip if already attacked
@@ -3719,19 +3733,38 @@ recordShipDetection(layer, index) {
   }
   
   calculateMove(gameBoard) {
+    const move = this._calculateMoveInternal(gameBoard);
+
+    // Safety net: never fire at a layer that's already been cleared out.
+    // If the primary targeting logic slipped (e.g. stale state, unusual
+    // fleet composition), redirect to any remaining attackable layer.
+    if (move && this.shipCompleted(move.layer)) {
+      for (const layer of GAME_CONSTANTS.LAYERS) {
+        if (this.shipCompleted(layer)) continue;
+        const fallbackMoves = this.getAvailableMoves(gameBoard, layer);
+        if (fallbackMoves.length > 0) {
+          const idx = fallbackMoves[Math.floor(Math.random() * fallbackMoves.length)];
+          return { layer, index: idx };
+        }
+      }
+    }
+    return move;
+  }
+
+  _calculateMoveInternal(gameBoard) {
     // First priority: continue attacking a ship we've already hit
     if (this.layerState.Space.hits.length > 0 && !this.shipCompleted('Space')) {
       return this.handleSpaceLayerLogic(gameBoard);
     }
-    
+
     if (this.layerState.Sea.hits.length > 0 && !this.shipCompleted('Sea')) {
       return this.handleSeaLayerLogic(gameBoard);
     }
-    
+
     if (this.layerState.Sub.hits.length > 0 && !this.shipCompleted('Sub')) {
       return this.handleSubLayerLogic(gameBoard);
     }
-    
+
     // Next priority: attack Sky layer if we haven't completed it
     if (!this.shipCompleted('Sky') && this.layerState.Sky.hits.length > 0) {
       const skyMove = this.getOptimalSkyMove(gameBoard);
@@ -3739,23 +3772,23 @@ recordShipDetection(layer, index) {
         return { layer: 'Sky', index: skyMove };
       }
     }
-    
+
     // Sometimes make a random move to simulate human unpredictability
     if (Math.random() < this.personality.unpredictability) {
-      const availableLayers = GAME_CONSTANTS.LAYERS.filter(layer => 
+      const availableLayers = GAME_CONSTANTS.LAYERS.filter(layer =>
         !this.shipCompleted(layer));
-      
+
       if (availableLayers.length > 0) {
         const randomLayer = availableLayers[Math.floor(Math.random() * availableLayers.length)];
         const availableMoves = this.getAvailableMoves(gameBoard, randomLayer);
-        
+
         if (availableMoves.length > 0) {
           const randomIndex = Math.floor(Math.random() * availableMoves.length);
           return { layer: randomLayer, index: availableMoves[randomIndex] };
         }
       }
     }
-    
+
     // Choose a layer based on weighted probability of finding a ship
     return this.getStrategyBasedMove(gameBoard);
   }
@@ -4468,19 +4501,25 @@ shipCompleted(layer) {
     // Fall through to legacy logic.
   }
 
-  // Fallback: legacy hit-count logic (used if game state is unavailable).
-  if (layer === 'Sky') {
-    if (this.layerState.Sky.hits.length === 0) return false;
-    return true;
-  }
-  const requiredHits = {
-    Space: 4,  // 2x2 square ship
-    Sky: 1,    // Single cell ship (handled above)
-    Sea: 5,    // 3-cell + 2-cell ships
-    Sub: 2     // 2-cell ship
+  // Fallback: use sunkShips tracking + current hunt state. This is
+  // reliable after recordSunk() clears layerState[layer].hits because it
+  // keeps a cumulative record of sinks per layer.
+  const defaultShipsPerLayer = {
+    Space: 1,  // Spacecraft
+    Sky: 1,    // FighterJet (ExtraJet handled in primary check only)
+    Sea: 2,    // Battleship + Cruiser
+    Sub: 1     // Submarine
   };
-  const shipHits = this.layerState[layer].hits.length;
-  return shipHits >= requiredHits[layer];
+  const expected = defaultShipsPerLayer[layer] || 0;
+  const sunkCount = (this.sunkShips && this.sunkShips[layer]) ? this.sunkShips[layer].length : 0;
+  if (sunkCount >= expected) return true;
+
+  // Not all ships confirmed sunk yet — if we're still hunting an
+  // unfinished ship (hits present), keep hunting; otherwise fall back to
+  // the old hit-count heuristic so we don't regress vs. pre-fix behavior.
+  if (this.layerState[layer] && this.layerState[layer].hits.length > 0) return false;
+  const requiredHits = { Space: 4, Sky: 1, Sea: 5, Sub: 2 };
+  return (this.layerState[layer]?.hits.length || 0) >= requiredHits[layer];
 }
   
 // Add this to the recordHit method in GameAI
