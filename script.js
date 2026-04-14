@@ -1856,15 +1856,18 @@ startNewGame(mode) {
        this.animateCommentaryBox();
        this.ui.showTreasureMenu();
        // Turn stays with me after selecting powerup
+       this.isProcessingTurn = false;
     } else if (result.hit) {
        // I hit, I get another turn (like AI mode)
        this.ui.updateCommentary(result.sunk ? `You sunk their ${result.shipType}! Attack again!` : "Hit! Attack again!");
        this.animateCommentaryBox();
        // currentTurn stays as myPlayerId
+       this.isProcessingTurn = false;
     } else {
        // I missed, switch turn to opponent
        this.gameState.currentTurn = this.gameState.myPlayerId === 1 ? 2 : 1;
        this.ui.updateCommentary("You missed! Opponent's Turn - Wait...");
+       this.isProcessingTurn = false;
     }
   }
 
@@ -2104,15 +2107,20 @@ _initCombat() {
         }
         // Only allow clicking opponent board
         if (!e.target.closest('.opponent-boards')) return;
-        
+
         const index = parseInt(e.target.dataset.index);
         const layer = e.target.closest('.board').dataset.layer;
-        
+
         if (e.target.classList.contains('hit') || e.target.classList.contains('miss')) return;
+
+        // Lock out further clicks until ATTACK_RESULT comes back; without
+        // this a fast player could fire the same ATTACK twice before the
+        // opponent responds.
+        this.isProcessingTurn = true;
 
         // Track my shot locally
         this.gameState.shots.player.total++;
-        
+
         this.network.send({
            type: 'ATTACK',
            index: index,
@@ -6187,10 +6195,9 @@ class NetworkManager {
     this.lastPingTime = null;
     this.currentPing = null;
 
-    // Track which message IDs we've already handled so reconnects don't replay
+    // Track which message IDs we've already handled. Populated with
+    // pre-existing messages at pair time so we don't replay history.
     this.handledMessageIds = new Set();
-    // Only messages created after this timestamp are shown to the player
-    this.joinTimestamp = 0;
   }
 
   _getDb() {
@@ -6280,7 +6287,6 @@ class NetworkManager {
     this.roomCode = customId || this.generateRoomCode();
     this.roomRef = db.ref(`rooms/${this.roomCode}`);
     this.messagesRef = this.roomRef.child('messages');
-    this.joinTimestamp = Date.now();
     this.handledMessageIds.clear();
 
     try {
@@ -6325,7 +6331,6 @@ class NetworkManager {
     this.roomCode = remoteId;
     this.roomRef = db.ref(`rooms/${this.roomCode}`);
     this.messagesRef = this.roomRef.child('messages');
-    this.joinTimestamp = Date.now();
     this.handledMessageIds.clear();
 
     try {
@@ -6370,7 +6375,7 @@ class NetworkManager {
    * Called once both host and guest are present. Wires up the message
    * listener and notifies the game that a peer has connected.
    */
-  _onRoomPaired() {
+  async _onRoomPaired() {
     if (this.isConnected) return;
     this.isConnected = true;
     this.updateConnectionUI('connected', 'Connected');
@@ -6384,18 +6389,36 @@ class NetworkManager {
       });
     }
 
-    // Listen for new messages (append-only log). Filter out our own
-    // messages and anything timestamped before we joined.
+    // Pre-mark any messages that already exist in the room so we don't
+    // replay them. This is more reliable than a timestamp filter (which
+    // would compare server-resolved ts against client-local Date.now,
+    // silently dropping every message if the client clock is ahead of
+    // the Firebase server — that was the original "attacks do nothing"
+    // bug). After this pre-mark step, the child_added listener will
+    // fire for every existing child (all skipped) and then for any new
+    // messages as they arrive.
+    try {
+      const existing = await this.messagesRef.get();
+      if (existing && existing.exists()) {
+        existing.forEach((child) => {
+          this.handledMessageIds.add(child.key);
+        });
+      }
+    } catch (e) {
+      console.warn('Could not read existing messages; falling back to full replay', e);
+    }
+
+    // Listen for new messages (append-only log). We skip messages we've
+    // already marked as handled (pre-existing or previously processed)
+    // and messages we sent ourselves.
     this.messagesListener = this.messagesRef.on('child_added', (snap) => {
       const msg = snap.val();
       const id = snap.key;
       if (!msg || this.handledMessageIds.has(id)) return;
       this.handledMessageIds.add(id);
 
-      // Skip our own messages
+      // Skip our own messages (Firebase echoes writes back to the sender)
       if (msg.from === this.clientId) return;
-      // Skip stale messages from before we joined
-      if (typeof msg.ts === 'number' && msg.ts < this.joinTimestamp - 1000) return;
 
       const data = msg.payload;
       if (!data) return;
