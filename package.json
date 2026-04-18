@@ -1,0 +1,9 @@
+{
+  "name": "warzones",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Four-layer naval-combat browser game.",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}
