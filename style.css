@@ -27,6 +27,15 @@
   --box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -97,7 +106,25 @@ body {
 .menu-buttons {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 1rem;
+}
+
+.menu-notice {
+  max-width: 320px;
+  margin: 0 0 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.78em;
+  line-height: 1.4;
+  color: #e0e0e0;
+  background: rgba(255, 196, 0, 0.08);
+  border: 1px solid rgba(255, 196, 0, 0.4);
+  border-radius: var(--border-radius);
+  text-align: left;
+}
+
+.menu-notice strong {
+  color: #ffc400;
 }
 
 .menu-button {

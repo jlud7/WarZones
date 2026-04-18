@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,6 +23,12 @@
   </script>
 </head>
 <body>
+  <noscript>
+    <div style="padding:2rem;text-align:center;color:#fff;font-family:sans-serif;">
+      <h1>WarZones requires JavaScript</h1>
+      <p>Please enable JavaScript in your browser to play.</p>
+    </div>
+  </noscript>
   <!-- Game Menu -->
   <div id="gameMenu" class="menu-overlay">
     <div class="menu-content">
@@ -38,6 +44,11 @@
 
       <!-- Online Menu (Hidden by default) -->
       <div class="menu-buttons hidden" id="onlineMenuButtons">
+        <p class="menu-notice">
+          <strong>Friends only.</strong> Online play uses a trust-based protocol &mdash;
+          share codes with people you know. A determined opponent with dev tools
+          could cheat, so this mode is meant for casual matches, not competition.
+        </p>
         <button id="hostGame" class="menu-button">Host Game</button>
         <button id="joinGame" class="menu-button">Join Game</button>
         <button id="backToMain" class="menu-button">Back</button>

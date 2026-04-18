@@ -56,7 +56,7 @@ class WarZones {
     this.campaign = new CampaignManager(this);
     this.network = new NetworkManager(this);
     this.playerWins = 0;
-    this.aiWins = 0;
+    this.player2Wins = 0;
     this.aiTurnTimeouts = []; // Track AI turn timeouts
     this.isProcessingTurn = false; // Flag to prevent multiple attacks
 
@@ -76,7 +76,6 @@ class WarZones {
 
   initialize() {
     this.setupEventListeners();
-    this.loadSavedGame();
     this.ui.renderMainMenu();
     this.createGameBoards();
   }
@@ -358,7 +357,7 @@ activateKryptonLaser() {
         if (result.gameOver.winner === 'player') {
           game.playerWins++;
         } else {
-          game.aiWins++;
+          game.player2Wins++;
         }
         
         game.ui.updateScoreBoard();
@@ -602,7 +601,7 @@ activateCannonBall() {
         if (result.gameOver.winner === 'player') {
           this.playerWins++;
         } else {
-          this.aiWins++;
+          this.player2Wins++;
         }
         
         this.ui.updateScoreBoard();
@@ -795,20 +794,6 @@ showAIPowerupSelection(powerupType) {
   }, 2000);
 }
 
-activatePowerup(powerupType) {
-  switch(powerupType) {
-    case 'BlackBox':
-      this.activateBlackBox();
-      break;
-    case 'KryptonLaser':
-      this.activateKryptonLaser();
-      break;
-    case 'CannonBall':  // Changed from SonarPulse
-      this.activateCannonBall();
-      break;
-  }
-}
-
   activatePowerupForAI(powerupType) {
   switch(powerupType) {
     case 'BlackBox':
@@ -960,7 +945,7 @@ aiUseKryptonLaser() {
   for (const result of results) {
     if (result.gameOver && result.gameOver.isOver) {
       this.sound.playSound('defeat');
-      this.aiWins++;
+      this.player2Wins++;
       this.ui.updateScoreBoard();
       this.gameState.phase = 'gameOver';
       this.isProcessingTurn = false;
@@ -1049,7 +1034,7 @@ aiUseCannonBall() {
   for (const result of results) {
     if (result.gameOver && result.gameOver.isOver) {
       this.sound.playSound('defeat');
-      this.aiWins++;
+      this.player2Wins++;
       this.ui.updateScoreBoard();
       this.gameState.phase = 'gameOver';
       this.isProcessingTurn = false;
@@ -1283,6 +1268,12 @@ aiUseCannonBall() {
     setTimeout(() => notif.remove(), 4000);
   }
 
+  _cellCoord(index) {
+    const row = Math.floor(index / GAME_CONSTANTS.BOARD_SIZE);
+    const col = index % GAME_CONSTANTS.BOARD_SIZE;
+    return `${String.fromCharCode(65 + row)}${col + 1}`;
+  }
+
   createGameBoards() {
     const boards = GAME_CONSTANTS.LAYERS.map(layer => ({ id: layer, name: layer }));
     const playerBoardContainer = document.querySelector('.player-boards .boards-wrapper');
@@ -1312,11 +1303,15 @@ aiUseCannonBall() {
       pBoard.className = 'board';
       pBoard.id = `player${board.id}Board`;
       pBoard.dataset.layer = board.id;
+      pBoard.setAttribute('role', 'grid');
+      pBoard.setAttribute('aria-label', `Your ${layerNames[board.id]} layer`);
       for (let i = 0; i < GAME_CONSTANTS.BOARD_SIZE ** 2; i++) {
         const cell = document.createElement('div');
         cell.className = 'cell';
         cell.dataset.index = i;
         cell.dataset.layer = board.id;
+        cell.setAttribute('role', 'gridcell');
+        cell.setAttribute('aria-label', `${layerNames[board.id]} ${this._cellCoord(i)}`);
 
         // Add hover event listeners to each cell
         cell.addEventListener('mouseover', (e) => {
@@ -1351,11 +1346,15 @@ aiUseCannonBall() {
       oBoard.className = 'board';
       oBoard.id = `opponent${board.id}Board`;
       oBoard.dataset.layer = board.id;
+      oBoard.setAttribute('role', 'grid');
+      oBoard.setAttribute('aria-label', `Opponent ${layerNames[board.id]} layer`);
       for (let i = 0; i < GAME_CONSTANTS.BOARD_SIZE ** 2; i++) {
         const cell = document.createElement('div');
         cell.className = 'cell';
         cell.dataset.index = i;
         cell.dataset.layer = board.id;
+        cell.setAttribute('role', 'gridcell');
+        cell.setAttribute('aria-label', `Opponent ${layerNames[board.id]} ${this._cellCoord(i)}`);
 
         // Add hover event listeners to each cell
         cell.addEventListener('mouseover', (e) => {
@@ -2706,7 +2705,7 @@ _initCombat() {
           if (this.gameState.currentPlayer === 1) {
             this.playerWins++;
           } else {
-            this.aiWins++; // Player 2 wins are tracked in aiWins variable
+            this.player2Wins++;
           }
         } else {
           // In AI game, player wins
@@ -2714,7 +2713,7 @@ _initCombat() {
         }
       } else {
         // AI or Player 2 wins
-        this.aiWins++;
+        this.player2Wins++;
       }
       
       this.ui.updateScoreBoard();
@@ -2890,7 +2889,7 @@ handleAITurn() {
         if (aiResult.gameOver.winner === 'player') {
           this.playerWins++;
         } else {
-          this.aiWins++;
+          this.player2Wins++;
         }
         
         this.ui.updateScoreBoard();
@@ -2973,17 +2972,6 @@ handleAITurn() {
     }, 1000);
   }
 
-  loadSavedGame() {
-    const savedState = localStorage.getItem('warZonesGameState');
-    if (savedState) {
-      try {
-        const state = JSON.parse(savedState);
-        this.gameState.loadState(state);
-      } catch (error) {
-        console.error('Error loading saved game:', error);
-      }
-    }
-  }
 }
 
 /* --- Sound Manager --- */
@@ -3972,21 +3960,6 @@ placeTreasureChests() {
     return lastMove;
   }
   
-  saveState() {
-    return {
-      boards: this.boards,
-      ships: this.ships,
-      shots: this.shots,
-      currentShipIndex: this.currentShipIndex,
-      phase: this.phase,
-      gameMode: this.gameMode,
-      moveHistory: this.moveHistory
-    };
-  }
-  
-  loadState(state) {
-    Object.assign(this, state);
-  }
 }
 
 /* --- Game AI --- */
@@ -4072,36 +4045,6 @@ class GameAI {
     // Refresh probability maps for the new game
     this.probabilityMaps = this.initProbabilityMaps();
   }
-  
-  // Add to GameAI class
-recordShipDetection(layer, index) {
-  // When sonar detects a ship, update the AI's probability maps
-  if (this.probabilityMaps[layer]) {
-    this.probabilityMaps[layer][index] += 3;
-    
-    // Increase probability for adjacent cells
-    const row = Math.floor(index / this.boardSize);
-    const col = index % this.boardSize;
-    
-    // Check horizontal and vertical adjacent cells
-    const directions = [
-      {dr: -1, dc: 0}, // up
-      {dr: 1, dc: 0},  // down
-      {dr: 0, dc: -1}, // left
-      {dr: 0, dc: 1},  // right
-    ];
-    
-    for (const {dr, dc} of directions) {
-      const newRow = row + dr;
-      const newCol = col + dc;
-      
-      if (this.isValidPosition(newRow, newCol)) {
-        const newIndex = newRow * this.boardSize + newCol;
-        this.probabilityMaps[layer][newIndex] += 2;
-      }
-    }
-  }
-}
   
   // Generate a randomized pattern for targeting Sky layer
   generateRandomPattern() {
@@ -5240,56 +5183,6 @@ updateBoard(result) {
   this.game.updateShipCounter();
 }
 
-showSonarEffect(side, layer, centerIndex) {
-  const prefix = side === 'player' ? 'player' : 'opponent';
-  const boardId = `${prefix}${layer}Board`;
-  const board = document.getElementById(boardId);
-  const boardSize = GAME_CONSTANTS.BOARD_SIZE;
-  
-  // Get center position
-  const row = Math.floor(centerIndex / boardSize);
-  const col = centerIndex % boardSize;
-  
-  // Calculate 2x2 area positions
-  const positions = [];
-  for (let r = row; r < row + 2 && r < boardSize; r++) {
-    for (let c = col; c < col + 2 && c < boardSize; c++) {
-      positions.push(r * boardSize + c);
-    }
-  }
-  
-  // Show ships in that area if they exist
-  positions.forEach(pos => {
-    const cell = board.querySelector(`.cell[data-index="${pos}"]`);
-    if (!cell) return;
-    
-    // Get ship at this position
-    const cellValue = side === 'player' ? 
-      this.game.gameState.boards.player[layer][pos] : 
-      this.game.gameState.boards.opponent[layer][pos];
-    
-    if (cellValue && cellValue !== 'hit' && cellValue !== 'miss' && cellValue !== 'Treasure') {
-      // Highlight cell to show ship presence without revealing exact type
-      cell.classList.add('sonar-detected');
-      
-      // If AI is scanning player's board, also reveal to AI
-      if (side === 'player') {
-        this.game.ai.recordShipDetection(layer, pos);
-      }
-    } else {
-      // No ship here
-      cell.classList.add('sonar-scanned');
-    }
-  });
-  
-  // Remove effect after a few seconds
-  setTimeout(() => {
-    board.querySelectorAll('.sonar-detected, .sonar-scanned').forEach(cell => {
-      cell.classList.remove('sonar-detected', 'sonar-scanned');
-    });
-  }, 3000);
-}
-  
   showRoomCode(code) {
     document.getElementById('roomCodeDisplay').textContent = code;
     document.getElementById('roomCodeDisplay').title = "Click to copy";
@@ -5463,7 +5356,7 @@ showSonarEffect(side, layer, centerIndex) {
     
     // Update win counts
     document.getElementById('player1Wins').textContent = this.game.playerWins;
-    document.getElementById('player2Wins').textContent = this.game.aiWins;
+    document.getElementById('player2Wins').textContent = this.game.player2Wins;
   }
   
   setupBoardHoverEffects() {
@@ -6760,7 +6653,7 @@ class NetworkManager {
       this.game.ui.updateCommentary('Could not create room. Check your internet connection.');
       setTimeout(() => {
         this.hideConnectionUI();
-        this.game.ui.showMainMenu();
+        this.game.ui.renderMainMenu();
       }, 2500);
     }
   }
@@ -6790,7 +6683,7 @@ class NetworkManager {
         this.game.ui.updateCommentary('Room not found. Check the room code and try again.');
         setTimeout(() => {
           this.hideConnectionUI();
-          this.game.ui.showMainMenu();
+          this.game.ui.renderMainMenu();
         }, 2500);
         this.roomRef = null;
         return;
@@ -6815,7 +6708,7 @@ class NetworkManager {
       this.game.ui.updateCommentary('Could not join room. Check your internet connection.');
       setTimeout(() => {
         this.hideConnectionUI();
-        this.game.ui.showMainMenu();
+        this.game.ui.renderMainMenu();
       }, 2500);
     }
   }
@@ -6893,7 +6786,7 @@ class NetworkManager {
       this.game.ui.updateCommentary('Opponent disconnected!');
       setTimeout(() => {
         this.hideConnectionUI();
-        this.game.ui.showMainMenu();
+        this.game.ui.renderMainMenu();
       }, 2000);
     }
   }
@@ -7042,36 +6935,25 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.addEventListener('touchmove', (e) => {
     if (!touchStartX || !touchStartY) return;
-    
+    if (game.gameState.phase !== 'setup') return;
+
+    // Only treat as a rotate gesture if the swipe originated on the
+    // active placement board — otherwise let the page scroll normally.
+    const target = e.target.closest('.board');
+    if (!target || !target.id.startsWith('player')) return;
+
     const touchEndX = e.touches[0].clientX;
+    const touchEndY = e.touches[0].clientY;
     const deltaX = touchEndX - touchStartX;
-    
-    if (Math.abs(deltaX) > 50) {
+    const deltaY = touchEndY - touchStartY;
+
+    // Require the gesture to be dominantly horizontal, so vertical
+    // scrolls don't accidentally rotate.
+    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
       game.rotateShip();
+      touchStartX = null;
+      touchStartY = null;
     }
-    
-    touchStartX = null;
-    touchStartY = null;
   });
 });
 
-// Helper functions
-function getRandomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-function calculateAccuracy(hits, total) {
-  return total === 0 ? 0 : Math.round((hits / total) * 100);
-}
