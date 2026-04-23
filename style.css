@@ -634,13 +634,13 @@ body {
 }
 .cell.hit[data-ship]::after { display: none; }
 
-.cell[data-ship="Spacecraft"]  { --ship-sprite: url('assets/ships/spacecraft.png'); }
-.cell[data-ship="FighterJet"]  { --ship-sprite: url('assets/ships/fighterjet.png'); }
-.cell[data-ship="Battleship"]  { --ship-sprite: url('assets/ships/battleship.png'); }
-.cell[data-ship="Cruiser"]     { --ship-sprite: url('assets/ships/cruiser.png'); }
-.cell[data-ship="Destroyer"]   { --ship-sprite: url('assets/ships/destroyer.png'); }
-.cell[data-ship="Submarine"]   { --ship-sprite: url('assets/ships/submarine.png'); }
-.cell[data-ship="ExtraJet"]    { --ship-sprite: url('assets/ships/fighterjet.png'); }
+.cell[data-ship="Spacecraft"]  { --ship-sprite: url('assets/ships/spacecraft.webp'); }
+.cell[data-ship="FighterJet"]  { --ship-sprite: url('assets/ships/fighterjet.webp'); }
+.cell[data-ship="Battleship"]  { --ship-sprite: url('assets/ships/battleship.webp'); }
+.cell[data-ship="Cruiser"]     { --ship-sprite: url('assets/ships/cruiser.webp'); }
+.cell[data-ship="Destroyer"]   { --ship-sprite: url('assets/ships/destroyer.webp'); }
+.cell[data-ship="Submarine"]   { --ship-sprite: url('assets/ships/submarine.webp'); }
+.cell[data-ship="ExtraJet"]    { --ship-sprite: url('assets/ships/fighterjet.webp'); }
 
 .cell.hit {
   background: rgba(255, 82, 82, 0.4) !important;
