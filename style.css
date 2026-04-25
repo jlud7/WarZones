@@ -1278,14 +1278,6 @@ body {
     --cell-size: 22px;
   }
 
-  /* vs-AI setup hides the opponent column via inline style. With only one
-     board on screen there's no reason to keep cells small — scale them up
-     so the single board fills the viewport instead of sitting as a narrow
-     centered strip. */
-  .game-container:has(.opponent-boards[style*="display: none"]) {
-    --cell-size: 40px;
-  }
-
   body {
     overflow-x: hidden;
     background-size: cover, 30px 30px;
@@ -1488,11 +1480,6 @@ body {
 @media (max-width: 480px) {
   :root {
     --cell-size: 20px;
-  }
-
-  /* Single-board setup: let cells breathe so ships are easy to place. */
-  .game-container:has(.opponent-boards[style*="display: none"]) {
-    --cell-size: 38px;
   }
 
   .win-counter {
@@ -4244,12 +4231,6 @@ body {
     --cell-size: clamp(22px, calc((100vw - 80px) / 8), 40px);
   }
 
-  /* Setup (vs AI): opponent column hidden via inline style.display='none'.
-     Single board can go much bigger — fills the phone naturally. */
-  .game-container:has(.opponent-boards[style*="display: none"]) {
-    --cell-size: clamp(42px, calc((100vw - 44px) / 4), 78px);
-  }
-
   /* Reserve space at the bottom of the body for the fixed control bar
      (~2 rows of buttons + gap + safe-area inset). */
   body {
@@ -4406,9 +4387,6 @@ body {
   :root {
     --cell-size: clamp(18px, calc((100vw - 60px) / 8), 36px);
   }
-  .game-container:has(.opponent-boards[style*="display: none"]) {
-    --cell-size: clamp(38px, calc((100vw - 36px) / 4), 64px);
-  }
   .layer-container { padding: 0.3rem 0.35rem 0.4rem; }
   .layer-container h2 { font-size: 0.75rem; }
   .boards-wrapper { gap: 0.3rem; }
@@ -4421,9 +4399,6 @@ body {
 @media (max-width: 896px) and (max-height: 500px) and (orientation: landscape) {
   :root {
     --cell-size: clamp(18px, calc((100vh - 140px) / 20), 28px);
-  }
-  .game-container:has(.opponent-boards[style*="display: none"]) {
-    --cell-size: clamp(26px, calc((100vh - 80px) / 10), 40px);
   }
   body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
   .game-controls {
@@ -4774,15 +4749,13 @@ body {
     gap: 2px;
   }
 
-  /* ---- Setup phase keeps single-board layout (no gutter, no enemy col) ---- */
-  .game-container:has(.opponent-boards[style*="display: none"]) {
-    grid-template-columns: 1fr;
-  }
-  .game-container:has(.opponent-boards[style*="display: none"]) .zone-gutter {
-    display: none;
-  }
-  .game-container:has(.opponent-boards[style*="display: none"]) .board-section .layer-label {
-    display: block;
+  /* ---- Force the dual-column combat layout during vs-AI setup too.
+     Game logic hides .opponent-boards via inline style during setup so a
+     desktop user only sees their own board; on mobile the unified
+     combat layout reads better than a single zoomed-in column, so we
+     override the inline rule and let the (empty) enemy column show. ---- */
+  .layer-container.opponent-boards[style*="display: none"] {
+    display: block !important;
   }
 
   /* ---- Footer combat CTA banner ---- */
