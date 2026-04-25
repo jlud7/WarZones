@@ -429,6 +429,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Margins for scrollIntoView (called by ui.highlightPlacementBoard).
+     Keep the active zone clear of the sticky header (~60px) and the
+     fixed mobile control bar (~120px). `nearest` honors these. */
+  scroll-margin-top: 70px;
+  scroll-margin-bottom: 130px;
 }
 
 .layer-label {
