@@ -4437,3 +4437,422 @@ body {
   .board { padding: 3px; gap: 1.5px; }
   .layer-label { font-size: 0.5rem; padding: 1px 5px; }
 }
+
+/* =============================================================
+   Mobile battle UI — cyan/amber tactical theme
+   =============================================================
+   Adds the elements introduced in index.html (turn pill, brand
+   wordmark, ATTACKING/STANDBY chips, center zone-gutter, footer
+   combat CTA). All new elements are hidden by default and shown
+   only inside the mobile breakpoint below.
+   Placed at the end of the file so its rules win over the earlier
+   .game-container / .player-score / .ship-counter mobile rules
+   without needing !important. */
+
+/* Hide the new battle-UI elements on desktop. */
+.turn-pill,
+.brand-wordmark,
+.zone-gutter,
+.combat-cta,
+.player-chip { display: none; }
+
+@media (max-width: 768px) {
+  :root {
+    --mb-cyan: #4FD8E8;
+    --mb-cyan-dim: #2A6E78;
+    --mb-amber: #F5A623;
+    --mb-amber-soft: rgba(245, 166, 35, 0.18);
+    --mb-green: #4ADE80;
+    --mb-panel: rgba(10, 14, 18, 0.85);
+    --mb-ink-dim: #8FB3B8;
+  }
+
+  /* ---- App-bar: turn pill | brand | menu ---- */
+  .game-header {
+    padding: 6px 10px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px;
+    background: rgba(10, 14, 18, 0.85);
+    border-bottom: 1px solid rgba(79, 216, 232, 0.18);
+  }
+  .game-header .timer { display: none; } /* turn pill replaces it */
+
+  .turn-pill {
+    display: inline-flex;
+    justify-self: start;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border: 1px solid var(--mb-cyan-dim);
+    border-radius: 999px;
+    background: rgba(79, 216, 232, 0.06);
+    box-shadow: inset 0 0 6px rgba(79, 216, 232, 0.08);
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    line-height: 1;
+  }
+  .turn-pill-label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1.8px; text-transform: uppercase;
+    color: var(--mb-cyan);
+  }
+  .turn-pill-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 700;
+    color: #fff; letter-spacing: 0.5px;
+  }
+
+  .brand-wordmark {
+    display: inline-flex;
+    justify-self: center;
+    align-items: baseline;
+    gap: 1px;
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .brand-wordmark .bw-name {
+    background: linear-gradient(180deg, #ffd98a 0%, #f5a623 55%, #b06a0a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.35));
+  }
+  .brand-wordmark .bw-tld {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--mb-cyan);
+    margin-left: 4px;
+    transform: translateY(-1px);
+    text-shadow: 0 0 6px rgba(79, 216, 232, 0.6);
+  }
+  .header-controls { justify-self: end; gap: 4px; }
+
+  /* ---- Player score cards w/ ATTACKING / STANDBY chip ---- */
+  .win-counter {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 6px 8px 0;
+    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    max-width: none;
+  }
+  .player-score {
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    min-width: 0;
+    padding: 6px 9px 7px;
+    background: var(--mb-panel);
+    border: 1px solid var(--mb-cyan-dim);
+    border-radius: 10px;
+    text-align: left;
+    gap: 4px;
+  }
+  .player-score.active {
+    border: 1px solid var(--mb-amber);
+    box-shadow:
+      0 0 0 1px var(--mb-amber),
+      0 0 14px rgba(245, 166, 35, 0.45),
+      inset 0 0 12px rgba(245, 166, 35, 0.08);
+    background: rgba(20, 12, 4, 0.88);
+  }
+  .player-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    justify-content: flex-start;
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--mb-cyan);
+    min-width: 0;
+  }
+  .player-score.active .player-info { color: var(--mb-amber); }
+  .player-icon { font-size: 0.95rem; margin: 0; flex-shrink: 0; }
+  .player-name {
+    font-size: 13px;
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .player-chip {
+    display: inline-block;
+    margin-left: auto;
+    padding: 2px 6px;
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    border-radius: 3px;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: var(--mb-amber);
+    color: #1a0f00;
+  }
+  .player-score:not(.active) .player-chip {
+    background: transparent;
+    color: var(--mb-ink-dim);
+    border: 1px solid var(--mb-cyan-dim);
+  }
+  .score-container { background: transparent; padding: 0; border: none; }
+  .win-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--mb-cyan);
+    margin-bottom: 1px;
+  }
+  .stats-row {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--mb-cyan);
+    gap: 6px;
+    line-height: 1.2;
+    justify-content: flex-start;
+  }
+  .stats-row .hits, .stats-row .accuracy { color: var(--mb-cyan); }
+
+  /* ---- Fleet chip rows (replaces the named ship-status pills) ---- */
+  .ship-counter.visible {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 8px 8px 0;
+    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    max-width: none;
+  }
+  .ship-counter-side { flex: initial; text-align: center; }
+  .ship-counter-side .counter-label {
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--mb-cyan);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .ships-list {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
+  .ship-status {
+    flex: 1;
+    min-width: 0;
+    height: 22px;
+    padding: 0;
+    gap: 0;
+    border: 1px solid var(--mb-green);
+    border-radius: 4px;
+    background: rgba(74, 222, 128, 0.08);
+    box-shadow: 0 0 4px rgba(74, 222, 128, 0.25),
+                inset 0 0 4px rgba(74, 222, 128, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 0;          /* hide ship name text */
+  }
+  .ship-status .ship-emoji { font-size: 14px; line-height: 1; }
+  .ship-status.sunk {
+    border-color: rgba(255, 82, 82, 0.4);
+    background: rgba(255, 82, 82, 0.1);
+    box-shadow: none;
+    opacity: 0.45;
+    text-decoration: none;
+  }
+
+  /* ---- Dual board with center zone-gutter ---- */
+  .game-container {
+    display: grid;
+    grid-template-columns: 1fr 26px 1fr;
+    align-items: stretch;
+    gap: 6px;
+    padding: 8px;
+    margin: 6px 0 0;
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  .layer-container.player-boards   { order: 1; }
+  .zone-gutter                     { order: 2; }
+  .layer-container.opponent-boards { order: 3; }
+
+  .layer-container {
+    background: transparent;
+    padding: 4px;
+    border: 1px solid var(--mb-cyan-dim);
+    border-radius: 8px;
+    box-shadow: inset 0 0 8px rgba(79, 216, 232, 0.05);
+    width: auto;
+    max-width: none;
+  }
+  .layer-container.player-boards {
+    border: 1px solid var(--mb-amber);
+    box-shadow:
+      0 0 0 1px var(--mb-amber),
+      0 0 16px rgba(245, 166, 35, 0.45),
+      inset 0 0 12px rgba(245, 166, 35, 0.06);
+  }
+  .layer-container.active { /* keep brand colors; turn signaled by chip + CTA */
+    border-color: inherit;
+  }
+  .layer-container h2 { display: none; }   /* names already in player cards */
+
+  .boards-wrapper { gap: 6px; }
+  .board-section .layer-label { display: none; }
+
+  /* Center gutter: SPACE / SKY / SEA / DEPTHS */
+  .zone-gutter {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0;
+  }
+  .zone-gutter-cell {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .zone-gutter-cell::before {
+    content: "";
+    position: absolute; inset: 0;
+    opacity: 0.18;
+  }
+  .zone-gutter-cell.zone-space::before { background: linear-gradient(180deg, #1a0f3d, #0d0626); }
+  .zone-gutter-cell.zone-sky::before   { background: linear-gradient(180deg, #2d6fa8, #4a96cc); }
+  .zone-gutter-cell.zone-sea::before   { background: linear-gradient(180deg, #0c5a7a, #0a3a55); }
+  .zone-gutter-cell.zone-sub::before   { background: linear-gradient(180deg, #0a4f4a, #04221f); }
+  .zone-gutter-cell span {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #fff;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 0 6px currentColor;
+  }
+  .zone-gutter-cell.zone-space span { color: #b896ff; }
+  .zone-gutter-cell.zone-sky span   { color: #8ec6ff; }
+  .zone-gutter-cell.zone-sea span   { color: #6fdce8; }
+  .zone-gutter-cell.zone-sub span   { color: #7ce8b8; }
+
+  /* The boards themselves: keep the existing --cell-size sizing logic
+     (already tuned via clamp() at line ~4244), just zero out the legacy
+     side margins. */
+  .board {
+    margin: 0 auto;
+    padding: 4px;
+    gap: 2px;
+  }
+
+  /* ---- Setup phase keeps single-board layout (no gutter, no enemy col) ---- */
+  .game-container:has(.opponent-boards[style*="display: none"]) {
+    grid-template-columns: 1fr;
+  }
+  .game-container:has(.opponent-boards[style*="display: none"]) .zone-gutter {
+    display: none;
+  }
+  .game-container:has(.opponent-boards[style*="display: none"]) .board-section .layer-label {
+    display: block;
+  }
+
+  /* ---- Footer combat CTA banner ---- */
+  .combat-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 8px 8px 4px;
+    padding: 0 12px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid rgba(79, 216, 232, 0.6);
+    background: linear-gradient(180deg, #2eb6c8 0%, #1d7d99 100%);
+    box-shadow:
+      0 0 14px rgba(79, 216, 232, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      inset 0 -8px 14px rgba(0, 0, 0, 0.25);
+    color: #fff;
+    font-family: 'Rajdhani', 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .combat-cta.hidden { display: none !important; }
+  .combat-cta .cta-icon { font-size: 14px; }
+  .combat-cta .cta-sub {
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: 0.85;
+    text-transform: none;
+    margin-left: 2px;
+  }
+  .combat-cta.opponent-turn {
+    background: linear-gradient(180deg, #6a7a85 0%, #3e4a52 100%);
+    border-color: rgba(143, 179, 184, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.15),
+      inset 0 -8px 14px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Tighten commentary; CTA + chip now carry whose-turn signal */
+  .commentary-box, #gameInfo {
+    margin: 4px 8px;
+    padding: 4px 8px;
+    font-size: 0.7em;
+    min-height: 0;
+    background: rgba(10, 14, 18, 0.8);
+    border: 1px solid rgba(79, 216, 232, 0.18);
+    color: var(--mb-ink-dim);
+  }
+  /* During combat (#fleetDock gains .hidden) the rotate/undo setup buttons
+     are no longer needed — the CTA carries the active signal instead. */
+  body:has(#fleetDock.hidden) .game-controls .primary-controls {
+    display: none;
+  }
+}
+
+/* Re-tighten the (max-width: 480px) sub-rules so the new chips/cells stay tidy. */
+@media (max-width: 480px) {
+  .turn-pill-label { font-size: 8px; letter-spacing: 1.5px; }
+  .turn-pill-num { font-size: 11px; }
+  .brand-wordmark { font-size: 16px; letter-spacing: 3.5px; }
+  .brand-wordmark .bw-tld { font-size: 9px; }
+  .player-name { font-size: 12px; }
+  .player-chip { font-size: 7px; padding: 2px 5px; letter-spacing: 1px; }
+  .game-container { grid-template-columns: 1fr 22px 1fr; gap: 5px; padding: 6px; }
+  .zone-gutter-cell span { font-size: 9px; letter-spacing: 3px; }
+  .combat-cta { font-size: 13px; height: 42px; }
+  .combat-cta .cta-sub { font-size: 10px; }
+}

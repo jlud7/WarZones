@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>War Zones - Advanced Naval Combat</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
+  <!-- Mobile battle-UI accent fonts: Rajdhani for tactical labels,
+       JetBrains Mono for stat numerals. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" />
   <link rel="stylesheet" href="style.css" />
   <!-- Preload ship sprites so placement has no load delay -->
   <link rel="preload" as="image" href="assets/ships/spacecraft.webp" />
@@ -83,6 +86,14 @@
   <!-- Game Header -->
   <header class="game-header">
     <div id="gameTimer" class="timer">00:00</div>
+    <!-- Mobile-only turn pill (shown via CSS at narrow widths). Numeric
+         counter is updated by lib/game.js whenever the active player changes. -->
+    <div id="turnPill" class="turn-pill">
+      <span class="turn-pill-label">Turn</span>
+      <span class="turn-pill-num" id="turnPillNum">01</span>
+    </div>
+    <!-- Mobile-only brand wordmark (matches the menu logo). -->
+    <div class="brand-wordmark"><span class="bw-name">Warzones</span><span class="bw-tld">.io</span></div>
     <div class="header-controls">
       <button id="helpButton" class="icon-button" title="How to Play">❓</button>
       <button id="toggleSound" class="icon-button">🔊</button>
@@ -95,6 +106,7 @@
       <div class="player-info">
         <span class="player-icon" id="player1Icon">👤</span>
         <span class="player-name">Player 1</span>
+        <span class="player-chip">ATTACKING</span>
       </div>
       <div class="score-container">
         <div class="win-label">Wins: <span id="player1Wins">0</span></div>
@@ -108,6 +120,7 @@
       <div class="player-info">
         <span class="player-icon" id="player2Icon">🤖</span>
         <span class="player-name" id="player2Name">AI</span>
+        <span class="player-chip">STANDBY</span>
       </div>
       <div class="score-container">
         <div class="win-label">Wins: <span id="player2Wins">0</span></div>
@@ -154,6 +167,15 @@
   
   <!-- Game Container -->
   <div class="game-container">
+    <!-- Mobile-only center gutter listing the four zones once between
+         the player and enemy columns (replaces per-board labels at narrow
+         widths). Stays in DOM order so flex order keeps it centered. -->
+    <div class="zone-gutter" aria-hidden="true">
+      <div class="zone-gutter-cell zone-space"><span>Space</span></div>
+      <div class="zone-gutter-cell zone-sky"><span>Sky</span></div>
+      <div class="zone-gutter-cell zone-sea"><span>Sea</span></div>
+      <div class="zone-gutter-cell zone-sub"><span>Depths</span></div>
+    </div>
     <div class="layer-container player-boards active">
       <h2 id="playerBoardTitle">Player 1</h2>
       <div class="boards-wrapper">
@@ -211,6 +233,14 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Mobile-only combat CTA banner. Hidden on desktop and in setup; the
+       text is updated by script.js to reflect whose turn it is. -->
+  <div id="combatCta" class="combat-cta hidden" role="status" aria-live="polite">
+    <span class="cta-icon">⚔</span>
+    <span class="cta-title">Your Turn</span>
+    <span class="cta-sub">— tap enemy board to attack</span>
   </div>
 
   <!-- Game Controls -->
