@@ -4230,31 +4230,31 @@ body {
 
 @media (max-width: 768px) {
   /* Combat: 2 columns x 4 cells = 8 cells across.
-     (100vw - ~80px fixed overhead) / 8 = cell size.
+     (100vw - ~72px fixed overhead) / 8 = cell size.
      Clamp caps the value so landscape tablets don't explode. */
   :root {
-    --cell-size: clamp(22px, calc((100vw - 80px) / 8), 40px);
+    --cell-size: clamp(19px, calc((100vw - 72px) / 8), 32px);
   }
 
   /* Reserve space at the bottom of the body for the fixed control bar
      (~2 rows of buttons + gap + safe-area inset). */
   body {
-    padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   /* ---- Top chrome: compact ---- */
-  .game-header { padding: 0.3rem 0.7rem; }
-  .timer { font-size: 0.78em; padding: 2px 7px; }
-  .icon-button { font-size: 1rem; }
+  .game-header { padding: 0.2rem 0.6rem; }
+  .timer { font-size: 0.72em; padding: 1px 6px; }
+  .icon-button { font-size: 0.95rem; }
 
   .win-counter {
-    padding: 0.3rem 0.45rem;
-    margin: 0.3rem auto 0.2rem;
+    padding: 0.2rem 0.4rem;
+    margin: 0.2rem auto 0.15rem;
     max-width: 480px;
-    gap: 6px;
+    gap: 5px;
   }
   .player-score {
-    padding: 0.3rem 0.45rem;
+    padding: 0.2rem 0.4rem;
     width: 50%;
     background: linear-gradient(145deg, rgba(30, 40, 58, 0.55), rgba(18, 22, 35, 0.70));
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4269,29 +4269,29 @@ body {
   .stats-row { font-size: 0.6em; gap: 5px; }
 
   .commentary-box {
-    font-size: 0.72em;
-    padding: 0.3rem 0.6rem;
-    margin: 0.2rem auto;
+    font-size: 0.7em;
+    padding: 0.2rem 0.5rem;
+    margin: 0.15rem auto;
     max-width: 480px;
-    min-height: 1.5rem;
+    min-height: 1.3rem;
     border: 1px solid rgba(255, 176, 64, 0.18);
   }
 
   .ship-counter.visible {
-    padding: 0.3rem 0.5rem;
-    margin: 0.2rem auto;
+    padding: 0.2rem 0.4rem;
+    margin: 0.15rem auto;
     max-width: 480px;
-    gap: 0.8rem;
+    gap: 0.6rem;
   }
   .ship-counter-side .counter-label {
-    font-size: 0.7em;
+    font-size: 0.65em;
     letter-spacing: 0.08em;
-    margin-bottom: 0.15rem;
+    margin-bottom: 0.1rem;
   }
 
   .fleet-dock {
-    padding: 0.4rem 0.6rem;
-    margin: 0.25rem auto;
+    padding: 0.3rem 0.5rem;
+    margin: 0.15rem auto;
     max-width: 480px;
   }
   .fleet-dock-ships { gap: 0.4rem; }
@@ -4304,14 +4304,14 @@ body {
     flex-wrap: nowrap;
     justify-content: center;
     align-items: flex-start;
-    gap: 8px;
-    padding: 0.25rem 6px;
-    margin: 0.2rem auto 0;
+    gap: 6px;
+    padding: 0.15rem 5px;
+    margin: 0.15rem auto 0;
     max-width: 100%;
   }
 
   .layer-container {
-    padding: 0.35rem 0.4rem 0.45rem;
+    padding: 0.25rem 0.3rem 0.3rem;
     background: linear-gradient(145deg, rgba(30, 40, 58, 0.55), rgba(18, 22, 35, 0.70));
     border: 1px solid rgba(255, 255, 255, 0.08);
     margin: 0;
@@ -4320,27 +4320,27 @@ body {
     max-width: none;
   }
   .layer-container h2 {
-    font-size: 0.82rem;
-    margin-bottom: 0.3rem;
+    font-size: 0.78rem;
+    margin-bottom: 0.2rem;
   }
   .layer-container.active {
     border-color: rgba(255, 160, 0, 0.55);
     box-shadow: 0 0 12px rgba(255, 160, 0, 0.18);
   }
 
-  .boards-wrapper { gap: 0.35rem; }
+  .boards-wrapper { gap: 0.25rem; }
   .board-section { width: auto; align-items: center; }
 
   .layer-label {
     font-size: 0.55rem;
-    padding: 2px 6px;
-    margin-bottom: 0.15rem;
+    padding: 1px 5px;
+    margin-bottom: 0.1rem;
     letter-spacing: 0.06em;
   }
 
   .board {
-    padding: 4px;
-    gap: 2px;
+    padding: 3px;
+    gap: 1.5px;
     width: max-content;
     box-sizing: border-box;
   }
@@ -4354,10 +4354,10 @@ body {
     z-index: 55;
     max-width: none;
     width: 100%;
-    padding: 0.45rem 0.6rem;
-    padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.3rem 0.5rem;
+    padding-bottom: calc(0.3rem + env(safe-area-inset-bottom, 0px));
     margin: 0;
-    gap: 5px;
+    gap: 4px;
     background: linear-gradient(to top,
       rgba(11, 15, 23, 0.97) 0%,
       rgba(11, 15, 23, 0.92) 55%,
@@ -4368,15 +4368,15 @@ body {
   }
   .primary-controls,
   .new-game-controls {
-    gap: 5px;
+    gap: 4px;
     width: 100%;
   }
   .control-button {
-    padding: 8px 10px;
-    font-size: 0.72em;
+    padding: 6px 8px;
+    font-size: 0.68em;
     flex: 1;
     min-width: 0;
-    gap: 4px;
+    gap: 3px;
     justify-content: center;
   }
   .button-icon { font-size: 1em; }
@@ -4390,32 +4390,32 @@ body {
 /* Small phones: tighter overhead, same viewport-math */
 @media (max-width: 380px) {
   :root {
-    --cell-size: clamp(18px, calc((100vw - 60px) / 8), 36px);
+    --cell-size: clamp(16px, calc((100vw - 56px) / 8), 28px);
   }
-  .layer-container { padding: 0.3rem 0.35rem 0.4rem; }
-  .layer-container h2 { font-size: 0.75rem; }
-  .boards-wrapper { gap: 0.3rem; }
-  .control-button { padding: 7px 8px; font-size: 0.68em; }
-  .win-counter { padding: 0.25rem 0.35rem; }
-  .player-score { padding: 0.25rem 0.35rem; }
+  .layer-container { padding: 0.2rem 0.25rem 0.25rem; }
+  .layer-container h2 { font-size: 0.7rem; }
+  .boards-wrapper { gap: 0.2rem; }
+  .control-button { padding: 5px 6px; font-size: 0.64em; }
+  .win-counter { padding: 0.2rem 0.3rem; }
+  .player-score { padding: 0.2rem 0.3rem; }
 }
 
 /* Landscape phones: short height, cells scale off viewport height */
 @media (max-width: 896px) and (max-height: 500px) and (orientation: landscape) {
   :root {
-    --cell-size: clamp(18px, calc((100vh - 140px) / 20), 28px);
+    --cell-size: clamp(16px, calc((100vh - 120px) / 20), 26px);
   }
-  body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+  body { padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
   .game-controls {
-    padding: 0.3rem 0.5rem;
-    padding-bottom: calc(0.3rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.2rem 0.4rem;
+    padding-bottom: calc(0.2rem + env(safe-area-inset-bottom, 0px));
   }
-  .control-button { padding: 5px 8px; font-size: 0.65em; }
-  .layer-container { padding: 0.25rem 0.3rem 0.3rem; }
-  .layer-container h2 { font-size: 0.7rem; margin-bottom: 0.2rem; }
-  .boards-wrapper { gap: 0.25rem; }
-  .board { padding: 3px; gap: 1.5px; }
-  .layer-label { font-size: 0.5rem; padding: 1px 5px; }
+  .control-button { padding: 4px 7px; font-size: 0.62em; }
+  .layer-container { padding: 0.2rem 0.25rem 0.25rem; }
+  .layer-container h2 { font-size: 0.65rem; margin-bottom: 0.15rem; }
+  .boards-wrapper { gap: 0.2rem; }
+  .board { padding: 2px; gap: 1px; }
+  .layer-label { font-size: 0.48rem; padding: 1px 4px; }
 }
 
 /* =============================================================
@@ -4449,11 +4449,11 @@ body {
 
   /* ---- App-bar: turn pill | brand | menu ---- */
   .game-header {
-    padding: 6px 10px;
+    padding: 4px 8px;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background: rgba(10, 14, 18, 0.85);
     border-bottom: 1px solid rgba(79, 216, 232, 0.18);
   }
@@ -4463,8 +4463,8 @@ body {
     display: inline-flex;
     justify-self: start;
     align-items: center;
-    gap: 6px;
-    padding: 3px 9px;
+    gap: 5px;
+    padding: 2px 8px;
     border: 1px solid var(--mb-cyan-dim);
     border-radius: 999px;
     background: rgba(79, 216, 232, 0.06);
@@ -4473,13 +4473,13 @@ body {
     line-height: 1;
   }
   .turn-pill-label {
-    font-size: 9px; font-weight: 700;
-    letter-spacing: 1.8px; text-transform: uppercase;
+    font-size: 8px; font-weight: 700;
+    letter-spacing: 1.6px; text-transform: uppercase;
     color: var(--mb-cyan);
   }
   .turn-pill-num {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; font-weight: 700;
+    font-size: 11px; font-weight: 700;
     color: #fff; letter-spacing: 0.5px;
   }
 
@@ -4490,8 +4490,8 @@ body {
     gap: 1px;
     font-family: 'Rajdhani', 'Orbitron', sans-serif;
     font-weight: 700;
-    font-size: 18px;
-    letter-spacing: 4px;
+    font-size: 16px;
+    letter-spacing: 3.5px;
     text-transform: uppercase;
     line-height: 1;
   }
@@ -4520,8 +4520,8 @@ body {
     border: none;
     box-shadow: none;
     padding: 0;
-    margin: 6px 8px 0;
-    gap: 8px;
+    margin: 3px 6px 0;
+    gap: 6px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     max-width: none;
@@ -4531,12 +4531,12 @@ body {
     flex-direction: column;
     width: auto;
     min-width: 0;
-    padding: 6px 9px 7px;
+    padding: 4px 8px 5px;
     background: var(--mb-panel);
     border: 1px solid var(--mb-cyan-dim);
     border-radius: 10px;
     text-align: left;
-    gap: 4px;
+    gap: 2px;
   }
   .player-score.active {
     border: 1px solid var(--mb-amber);
@@ -4550,7 +4550,7 @@ body {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     margin: 0;
     justify-content: flex-start;
     font-family: 'Rajdhani', 'Orbitron', sans-serif;
@@ -4561,9 +4561,9 @@ body {
     min-width: 0;
   }
   .player-score.active .player-info { color: var(--mb-amber); }
-  .player-icon { font-size: 0.95rem; margin: 0; flex-shrink: 0; }
+  .player-icon { font-size: 0.85rem; margin: 0; flex-shrink: 0; }
   .player-name {
-    font-size: 13px;
+    font-size: 12px;
     flex-shrink: 1;
     min-width: 0;
     white-space: nowrap;
@@ -4573,7 +4573,7 @@ body {
   .player-chip {
     display: inline-block;
     margin-left: auto;
-    padding: 2px 6px;
+    padding: 1px 5px;
     font-family: 'Rajdhani', 'Orbitron', sans-serif;
     font-size: 8px;
     font-weight: 700;
@@ -4593,17 +4593,17 @@ body {
   .score-container { background: transparent; padding: 0; border: none; }
   .win-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 9px;
     color: var(--mb-cyan);
-    margin-bottom: 1px;
+    margin-bottom: 0;
   }
   .stats-row {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 500;
     color: var(--mb-cyan);
-    gap: 6px;
-    line-height: 1.2;
+    gap: 5px;
+    line-height: 1.15;
     justify-content: flex-start;
   }
   .stats-row .hits, .stats-row .accuracy { color: var(--mb-cyan); }
@@ -4614,8 +4614,8 @@ body {
     border: none;
     box-shadow: none;
     padding: 0;
-    margin: 8px 8px 0;
-    gap: 8px;
+    margin: 4px 6px 0;
+    gap: 6px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     max-width: none;
@@ -4623,24 +4623,24 @@ body {
   .ship-counter-side { flex: initial; text-align: center; }
   .ship-counter-side .counter-label {
     font-family: 'Rajdhani', 'Orbitron', sans-serif;
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
     color: var(--mb-cyan);
     letter-spacing: 2px;
     text-transform: uppercase;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     text-align: center;
   }
   .ships-list {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     flex-wrap: nowrap;
     justify-content: center;
   }
   .ship-status {
     flex: 1;
     min-width: 0;
-    height: 22px;
+    height: 18px;
     padding: 0;
     gap: 0;
     border: 1px solid var(--mb-green);
@@ -4654,7 +4654,7 @@ body {
     overflow: hidden;
     font-size: 0;          /* hide ship name text */
   }
-  .ship-status .ship-emoji { font-size: 14px; line-height: 1; }
+  .ship-status .ship-emoji { font-size: 12px; line-height: 1; }
   .ship-status.sunk {
     border-color: rgba(255, 82, 82, 0.4);
     background: rgba(255, 82, 82, 0.1);
@@ -4666,11 +4666,11 @@ body {
   /* ---- Dual board with center zone-gutter ---- */
   .game-container {
     display: grid;
-    grid-template-columns: 1fr 26px 1fr;
+    grid-template-columns: 1fr 22px 1fr;
     align-items: stretch;
-    gap: 6px;
-    padding: 8px;
-    margin: 6px 0 0;
+    gap: 5px;
+    padding: 4px 6px;
+    margin: 3px 0 0;
     flex-wrap: nowrap;
     max-width: 100%;
   }
@@ -4680,7 +4680,7 @@ body {
 
   .layer-container {
     background: transparent;
-    padding: 4px;
+    padding: 3px;
     border: 1px solid var(--mb-cyan-dim);
     border-radius: 8px;
     box-shadow: inset 0 0 8px rgba(79, 216, 232, 0.05);
@@ -4699,15 +4699,15 @@ body {
   }
   .layer-container h2 { display: none; }   /* names already in player cards */
 
-  .boards-wrapper { gap: 6px; }
+  .boards-wrapper { gap: 3px; }
   .board-section .layer-label { display: none; }
 
   /* Center gutter: SPACE / SKY / SEA / DEPTHS */
   .zone-gutter {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 4px 0;
+    gap: 3px;
+    padding: 2px 0;
   }
   .zone-gutter-cell {
     flex: 1;
@@ -4732,8 +4732,8 @@ body {
     transform: rotate(180deg);
     font-family: 'Rajdhani', 'Orbitron', sans-serif;
     font-weight: 700;
-    font-size: 10px;
-    letter-spacing: 4px;
+    font-size: 9px;
+    letter-spacing: 3px;
     text-transform: uppercase;
     color: #fff;
     position: relative;
@@ -4750,8 +4750,8 @@ body {
      side margins. */
   .board {
     margin: 0 auto;
-    padding: 4px;
-    gap: 2px;
+    padding: 3px;
+    gap: 1.5px;
   }
 
   /* ---- Force the dual-column combat layout during vs-AI setup too.
@@ -4768,11 +4768,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    margin: 8px 8px 4px;
-    padding: 0 12px;
-    height: 44px;
-    border-radius: 10px;
+    gap: 5px;
+    margin: 4px 6px 2px;
+    padding: 0 10px;
+    height: 34px;
+    border-radius: 8px;
     border: 1px solid rgba(79, 216, 232, 0.6);
     background: linear-gradient(180deg, #2eb6c8 0%, #1d7d99 100%);
     box-shadow:
@@ -4782,15 +4782,15 @@ body {
     color: #fff;
     font-family: 'Rajdhani', 'Orbitron', sans-serif;
     font-weight: 700;
-    font-size: 14px;
-    letter-spacing: 1.5px;
+    font-size: 12.5px;
+    letter-spacing: 1.3px;
     text-transform: uppercase;
   }
   .combat-cta.hidden { display: none !important; }
-  .combat-cta .cta-icon { font-size: 14px; }
+  .combat-cta .cta-icon { font-size: 13px; }
   .combat-cta .cta-sub {
     font-weight: 500;
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 1px;
     opacity: 0.85;
     text-transform: none;
@@ -4806,9 +4806,9 @@ body {
 
   /* Tighten commentary; CTA + chip now carry whose-turn signal */
   .commentary-box, #gameInfo {
-    margin: 4px 8px;
-    padding: 4px 8px;
-    font-size: 0.7em;
+    margin: 2px 6px;
+    padding: 3px 7px;
+    font-size: 0.68em;
     min-height: 0;
     background: rgba(10, 14, 18, 0.8);
     border: 1px solid rgba(79, 216, 232, 0.18);
@@ -4823,14 +4823,14 @@ body {
 
 /* Re-tighten the (max-width: 480px) sub-rules so the new chips/cells stay tidy. */
 @media (max-width: 480px) {
-  .turn-pill-label { font-size: 8px; letter-spacing: 1.5px; }
-  .turn-pill-num { font-size: 11px; }
-  .brand-wordmark { font-size: 16px; letter-spacing: 3.5px; }
-  .brand-wordmark .bw-tld { font-size: 9px; }
-  .player-name { font-size: 12px; }
-  .player-chip { font-size: 7px; padding: 2px 5px; letter-spacing: 1px; }
-  .game-container { grid-template-columns: 1fr 22px 1fr; gap: 5px; padding: 6px; }
-  .zone-gutter-cell span { font-size: 9px; letter-spacing: 3px; }
-  .combat-cta { font-size: 13px; height: 42px; }
-  .combat-cta .cta-sub { font-size: 10px; }
+  .turn-pill-label { font-size: 7px; letter-spacing: 1.3px; }
+  .turn-pill-num { font-size: 10px; }
+  .brand-wordmark { font-size: 14px; letter-spacing: 3px; }
+  .brand-wordmark .bw-tld { font-size: 8px; }
+  .player-name { font-size: 11px; }
+  .player-chip { font-size: 7px; padding: 1px 4px; letter-spacing: 1px; }
+  .game-container { grid-template-columns: 1fr 18px 1fr; gap: 4px; padding: 3px 4px; }
+  .zone-gutter-cell span { font-size: 8px; letter-spacing: 2.5px; }
+  .combat-cta { font-size: 11.5px; height: 32px; }
+  .combat-cta .cta-sub { font-size: 9px; }
 }
