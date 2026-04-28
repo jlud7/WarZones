@@ -4933,47 +4933,51 @@ body.drag-active .board {
 .drag-ghost[data-layer="Sea"]   .drag-ghost-zone { color: var(--sea-accent);   border-color: var(--sea-accent); }
 .drag-ghost[data-layer="Sub"]   .drag-ghost-zone { color: var(--sub-accent);   border-color: var(--sub-accent); }
 
-/* Ship grid — uses --cell-size so ghost cells line up with real board cells. */
+/* Ghost grid — minimal chrome so the ship sprite is the focus. The
+   valid / invalid signal is conveyed via a glow rather than a heavy
+   border so the ghost doesn't dominate the layout. */
 .drag-ghost-grid {
   display: grid;
   gap: 2px;
-  padding: 4px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.35);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 180ms ease;
+  padding: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  transition: box-shadow 120ms ease, transform 180ms ease;
 }
 .drag-ghost-grid.valid {
-  border-color: rgba(0, 200, 83, 0.85);
-  box-shadow: 0 0 18px rgba(0, 200, 83, 0.55), 0 6px 22px rgba(0,0,0,0.55);
+  box-shadow: 0 0 16px 2px rgba(0, 200, 83, 0.65), 0 6px 18px rgba(0,0,0,0.5);
 }
 .drag-ghost-grid.invalid {
-  border-color: rgba(239, 83, 80, 0.85);
-  box-shadow: 0 0 14px rgba(239, 83, 80, 0.55), 0 6px 22px rgba(0,0,0,0.55);
+  box-shadow: 0 0 14px 2px rgba(239, 83, 80, 0.65), 0 6px 18px rgba(0,0,0,0.5);
 }
 
+/* Ghost cells render the *actual* ship sprite via the shared
+   .cell[data-ship]::after rule. We override .cell sizing here to make
+   the preview noticeably smaller than a real placed cell — it should
+   feel like a held-aloft miniature, not a 1:1 stamp. */
+:root { --ghost-cell-size: calc(var(--cell-size) * 0.78); }
+
 .drag-ghost-cell {
-  width: var(--cell-size);
-  height: var(--cell-size);
+  width: var(--ghost-cell-size) !important;
+  height: var(--ghost-cell-size) !important;
   border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: default;
+  transition: none;
 }
-.drag-ghost[data-layer="Space"] .drag-ghost-cell {
-  background: var(--space-accent);
-  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
-}
-.drag-ghost[data-layer="Sky"] .drag-ghost-cell {
-  background: var(--sky-accent);
-  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
-}
-.drag-ghost[data-layer="Sea"] .drag-ghost-cell {
-  background: var(--sea-accent);
-  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
-}
-.drag-ghost[data-layer="Sub"] .drag-ghost-cell {
-  background: var(--sub-accent);
-  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
-}
+/* Subtle layer tint behind the sprite so the player still gets a color
+   cue about which zone this belongs to. */
+.drag-ghost[data-layer="Space"] .drag-ghost-cell { background: rgba(26, 35, 126, 0.40); border-color: rgba(92, 107, 192, 0.45); }
+.drag-ghost[data-layer="Sky"]   .drag-ghost-cell { background: rgba(2, 136, 209, 0.35);  border-color: rgba(79, 195, 247, 0.45); }
+.drag-ghost[data-layer="Sea"]   .drag-ghost-cell { background: rgba(0, 151, 167, 0.35);  border-color: rgba(77, 208, 225, 0.45); }
+.drag-ghost[data-layer="Sub"]   .drag-ghost-cell { background: rgba(0, 105, 92, 0.40);   border-color: rgba(38, 166, 154, 0.45); }
+
+/* Drop the inherited :hover/scale interactions on .cell — the ghost is
+   not interactive (parent has pointer-events:none), but the transition
+   would otherwise cause a visible scale jiggle when classes change. */
+.drag-ghost-cell:hover { transform: none; background: inherit; }
 
 /* Floating rotate button — sits next to the ghost. On touch a second
    finger can tap it without ending the drag (different pointerId). On
