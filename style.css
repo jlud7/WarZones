@@ -3151,18 +3151,11 @@ body {
 }
 
 .campaign-paths .path-segment {
-  fill: none;
-  stroke-width: 0.9;
-  stroke-linecap: round;
-}
-.campaign-paths .path-segment.unlocked {
-  stroke: rgba(255, 215, 0, 0.95);
-  stroke-dasharray: 2.2 1.4;
-  filter: drop-shadow(0 0 1.2px rgba(255, 215, 0, 0.9));
-}
-.campaign-paths .path-segment.locked {
-  stroke: rgba(255, 255, 255, 0.45);
-  stroke-dasharray: 1.6 2.2;
+  /* Trail dashes between mission nodes were visually noisy without
+     adding navigational value — the numbered labels and arrow already
+     convey order. Hidden rather than deleted so the SVG geometry is
+     trivially restorable. */
+  display: none;
 }
 
 .map-node {
