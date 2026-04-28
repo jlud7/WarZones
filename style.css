@@ -3281,15 +3281,19 @@ body {
   pointer-events: none;
 }
 .map-node-label .name {
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: white;
   background: rgba(10, 12, 20, 0.85);
   padding: 2px 6px;
   border-radius: 3px;
-  white-space: nowrap;
+  /* Names break after the first word (via <br> from campaign.js); allow
+     normal wrapping so both lines fit and stay centered. */
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
   border: 1px solid rgba(255,255,255,0.12);
 }
 .map-node.node-mini-boss .map-node-label .name { color: #ff8a8a; border-color: rgba(255, 82, 82, 0.4); }
