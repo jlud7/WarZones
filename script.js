@@ -44,8 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
           game.deactivateKeyboard();
           return;
         }
+        // Toggle the main menu — go through openMainMenu so the close
+        // (✕) button appears whenever a game is in progress.
         const menu = document.getElementById('gameMenu');
-        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+        if (menu.style.display === 'none') {
+          game.openMainMenu();
+        } else {
+          menu.style.display = 'none';
+        }
         break;
     }
   });
@@ -90,7 +96,6 @@ function setupMobileBattleHud(game) {
   if (cards.length !== 2) return;
 
   const turnNum = document.getElementById('turnPillNum');
-  const cta = document.getElementById('combatCta');
 
   let turnCount = 0;
   let lastActiveIdx = -1;
@@ -99,7 +104,9 @@ function setupMobileBattleHud(game) {
     const phase = game.gameState && game.gameState.phase;
     const activeIdx = cards[0].classList.contains('active') ? 0 : 1;
 
-    // Chip text mirrors the .active state.
+    // Chip text mirrors the .active state — these (ATTACKING/STANDBY)
+    // already give the player the active-turn signal, so the old
+    // combat CTA banner was redundant and has been removed.
     cards.forEach((card, i) => {
       const chip = card.querySelector('.player-chip');
       if (!chip) return;
@@ -117,23 +124,6 @@ function setupMobileBattleHud(game) {
       turnCount = 0;
       lastActiveIdx = -1;
       if (turnNum) turnNum.textContent = '01';
-    }
-
-    // Combat CTA — only meaningful in combat phase.
-    if (cta) {
-      if (phase !== 'combat') {
-        cta.classList.add('hidden');
-      } else {
-        cta.classList.remove('hidden');
-        const youAreActive = activeIdx === 0;
-        cta.classList.toggle('opponent-turn', !youAreActive);
-        const title = cta.querySelector('.cta-title');
-        const sub = cta.querySelector('.cta-sub');
-        if (title) title.textContent = youAreActive ? 'Your Turn' : 'Enemy Turn';
-        if (sub) sub.textContent = youAreActive
-          ? '— tap enemy board to attack'
-          : '— hold position';
-      }
     }
   }
 

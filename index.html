@@ -44,6 +44,7 @@
   <!-- Game Menu -->
   <div id="gameMenu" class="menu-overlay">
     <div class="menu-content">
+      <button id="menuCloseButton" class="close-button hidden" aria-label="Close menu">✕</button>
       <h1>WAR ZONES</h1>
       
       <div class="menu-buttons" id="mainMenuButtons">
@@ -95,6 +96,7 @@
     <!-- Mobile-only brand wordmark (matches the menu logo). -->
     <div class="brand-wordmark"><span class="bw-name">Warzones</span><span class="bw-tld">.io</span></div>
     <div class="header-controls">
+      <button id="menuButton" class="icon-button" title="Menu" aria-label="Menu">☰</button>
       <button id="helpButton" class="icon-button" title="How to Play">❓</button>
       <button id="toggleSound" class="icon-button">🔊</button>
     </div>
@@ -235,14 +237,6 @@
     </div>
   </div>
 
-  <!-- Mobile-only combat CTA banner. Hidden on desktop and in setup; the
-       text is updated by script.js to reflect whose turn it is. -->
-  <div id="combatCta" class="combat-cta hidden" role="status" aria-live="polite">
-    <span class="cta-icon">⚔</span>
-    <span class="cta-title">Your Turn</span>
-    <span class="cta-sub">— tap enemy board to attack</span>
-  </div>
-
   <!-- Game Controls -->
   <div class="game-controls">
     <div class="primary-controls">
@@ -253,16 +247,6 @@
       <button id="undoMove" class="control-button">
         <span class="button-icon">↩️</span>
         <span class="button-text">Undo Placement</span>
-      </button>
-    </div>
-    <div class="new-game-controls">
-      <button id="resetGame" class="control-button">
-        <span class="button-icon">🎮</span>
-        <span class="button-text">New AI Game</span>
-      </button>
-      <button id="newGameHuman" class="control-button">
-        <span class="button-icon">👥</span>
-        <span class="button-text">New 2 Player Game</span>
       </button>
     </div>
   </div>

@@ -4814,9 +4814,12 @@ body {
     border: 1px solid rgba(79, 216, 232, 0.18);
     color: var(--mb-ink-dim);
   }
-  /* During combat (#fleetDock gains .hidden) the rotate/undo setup buttons
-     are no longer needed — the CTA carries the active signal instead. */
-  body:has(#fleetDock.hidden) .game-controls .primary-controls {
+  /* During combat (#fleetDock gains .hidden) the rotate/undo setup
+     controls aren't relevant. With the bottom new-game buttons now
+     moved into the header menu, nothing in .game-controls is useful
+     during combat — hide the whole panel so its empty padding doesn't
+     leave a phantom band at the bottom of the screen. */
+  body:has(#fleetDock.hidden) .game-controls {
     display: none;
   }
 }
