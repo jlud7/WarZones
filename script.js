@@ -34,7 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         break;
       case 'Escape':
-        // If keyboard nav is active, deactivate it first
+        // Cancel an in-flight drag-to-place first.
+        if (game.ui?.dragController?.active) {
+          game.ui.dragController.cancel();
+          return;
+        }
+        // If keyboard nav is active, deactivate it next.
         if (game.keyboard.active) {
           game.deactivateKeyboard();
           return;
@@ -56,6 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('touchmove', (e) => {
     if (!touchStartX || !touchStartY) return;
     if (game.gameState.phase !== 'setup') return;
+    // The drag-to-place controller owns finger gestures during a drag —
+    // don't also fire the swipe-rotate path or we'd double-rotate.
+    if (document.body.classList.contains('drag-active')) return;
 
     // Only treat as a rotate gesture if the swipe originated on the
     // active placement board — otherwise let the page scroll normally.

@@ -4834,3 +4834,217 @@ body {
   .combat-cta { font-size: 11.5px; height: 32px; }
   .combat-cta .cta-sub { font-size: 9px; }
 }
+
+/* === Drag-to-place ship placement === */
+
+/* The current ship in the dock is the only draggable one. Show a grab cursor
+   on desktop and disable native scroll/zoom on touch so a finger drag isn't
+   intercepted as a page scroll. */
+.dock-ship.current {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.dock-ship.current:active { cursor: grabbing; }
+
+/* Mobile: keep the dock visible while the user reaches the boards. Sticks
+   to the top of the viewport during placement only — `.fleet-dock.hidden`
+   already removes it during combat. */
+@media (max-width: 768px) {
+  .fleet-dock {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: linear-gradient(145deg, rgba(26,35,50,0.92), rgba(11,15,23,0.92));
+  }
+}
+
+/* Suppress the regular hover-preview while a drag is in flight — the ghost
+   computes its own preview via elementFromPoint and we don't want both
+   layers fighting over .valid-placement / .invalid-placement classes. */
+body.drag-active .cell:hover {
+  /* purely defensive — no special hover effect during drag */
+}
+body.drag-active {
+  cursor: grabbing;
+}
+body.drag-active .board {
+  touch-action: none;
+}
+
+/* The drop-target cell pulses extra-strong so the user can see it under
+   their fingertip even with finger occlusion. Layered on top of
+   .valid-placement / .invalid-placement. */
+.cell.drop-target {
+  animation: dropTargetPulse 0.7s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes dropTargetPulse {
+  0%, 100% { transform: scale(1); filter: brightness(1.0); }
+  50%      { transform: scale(1.08); filter: brightness(1.35); }
+}
+
+/* === The ghost ship that follows the pointer === */
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;          /* never absorbs clicks */
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transform: translate3d(-9999px, -9999px, 0);
+  transition: opacity 180ms ease;
+  will-change: transform;
+}
+.drag-ghost.hidden { opacity: 0; }
+
+/* Snap-back animation when the user releases on an invalid spot. */
+.drag-ghost.snapping {
+  transition: transform 280ms cubic-bezier(0.5, 1.6, 0.4, 1), opacity 280ms ease;
+  opacity: 0;
+}
+
+/* Zone label chip floating above the ghost — answers "which board am I
+   placing on right now?" Especially helpful when finger occludes the
+   cells. */
+.drag-ghost-zone {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(10, 14, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.drag-ghost[data-layer="Space"] .drag-ghost-zone { color: var(--space-accent); border-color: var(--space-accent); }
+.drag-ghost[data-layer="Sky"]   .drag-ghost-zone { color: var(--sky-accent);   border-color: var(--sky-accent); }
+.drag-ghost[data-layer="Sea"]   .drag-ghost-zone { color: var(--sea-accent);   border-color: var(--sea-accent); }
+.drag-ghost[data-layer="Sub"]   .drag-ghost-zone { color: var(--sub-accent);   border-color: var(--sub-accent); }
+
+/* Ship grid — uses --cell-size so ghost cells line up with real board cells. */
+.drag-ghost-grid {
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 180ms ease;
+}
+.drag-ghost-grid.valid {
+  border-color: rgba(0, 200, 83, 0.85);
+  box-shadow: 0 0 18px rgba(0, 200, 83, 0.55), 0 6px 22px rgba(0,0,0,0.55);
+}
+.drag-ghost-grid.invalid {
+  border-color: rgba(239, 83, 80, 0.85);
+  box-shadow: 0 0 14px rgba(239, 83, 80, 0.55), 0 6px 22px rgba(0,0,0,0.55);
+}
+
+.drag-ghost-cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  border-radius: 3px;
+}
+.drag-ghost[data-layer="Space"] .drag-ghost-cell {
+  background: var(--space-accent);
+  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
+}
+.drag-ghost[data-layer="Sky"] .drag-ghost-cell {
+  background: var(--sky-accent);
+  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
+}
+.drag-ghost[data-layer="Sea"] .drag-ghost-cell {
+  background: var(--sea-accent);
+  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
+}
+.drag-ghost[data-layer="Sub"] .drag-ghost-cell {
+  background: var(--sub-accent);
+  box-shadow: inset 0 0 6px rgba(255,255,255,0.18);
+}
+
+/* Floating rotate button — sits next to the ghost. On touch a second
+   finger can tap it without ending the drag (different pointerId). On
+   desktop the user can keep using the R key, but the button is still
+   discoverable for mouse-only users. */
+.drag-rotate-btn {
+  position: fixed;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 215, 0, 0.85);
+  background: rgba(10, 14, 22, 0.92);
+  color: gold;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 9999;
+  pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6), 0 0 12px rgba(255,215,0,0.3);
+  touch-action: none;
+  transform: translate3d(-9999px, -9999px, 0);
+  transition: transform 80ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.drag-rotate-btn:active { transform-origin: center; }
+
+/* First-time placement coach mark on the active dock ship. Removed once
+   the user has dragged something at least once (we set a flag in
+   localStorage). */
+.dock-ship.current.drag-hint::before {
+  content: "DRAG TO PLACE";
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: gold;
+  color: #000;
+  white-space: nowrap;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(255, 215, 0, 0.5);
+  animation: dragHintBob 1.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 4;
+}
+.dock-ship.current.drag-hint::after {
+  content: "";
+  position: absolute;
+  bottom: calc(100% - 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: gold;
+  animation: dragHintBob 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes dragHintBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* Keep the dock-ship grabbed-state legible (slight lift + faded source
+   while the ghost is in flight). */
+.dock-ship.current.dragging {
+  opacity: 0.45;
+  transform: scale(0.96);
+}
