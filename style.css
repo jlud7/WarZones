@@ -4889,16 +4889,17 @@ body.drag-active .board {
 }
 
 /* === The ghost ship that follows the pointer === */
+/* The ghost's bounding box is intentionally equal to its *grid* — the
+   "Place on X" chip and the rotate button are both removed from flow
+   (absolute / fixed). Without that, the chip's wider text would inflate
+   the ghost width and viewport-clamping in _positionGhost would prevent
+   the grid from reaching the leftmost / rightmost columns of a board. */
 .drag-ghost {
   position: fixed;
   top: 0;
   left: 0;
   pointer-events: none;          /* never absorbs clicks */
   z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
   transform: translate3d(-9999px, -9999px, 0);
   transition: opacity 180ms ease;
   will-change: transform;
@@ -4911,10 +4912,17 @@ body.drag-active .board {
   opacity: 0;
 }
 
-/* Zone label chip floating above the ghost — answers "which board am I
-   placing on right now?" Especially helpful when finger occludes the
-   cells. */
+/* Zone label chip floats above the ghost grid as a decoration — out of
+   flow so it can't widen the ghost's hit box / clamping target. May
+   clip at the screen edge for ships placed in the leftmost / rightmost
+   columns; that's a fine tradeoff for being able to actually reach
+   those columns. */
 .drag-ghost-zone {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
   font-family: 'Orbitron', sans-serif;
   font-size: 10px;
   letter-spacing: 0.18em;
