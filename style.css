@@ -805,6 +805,24 @@ body {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
 }
 
+/* Orientation icon — bigger and weight-bumped so the ↔ / ↕ glyph is
+   readable on small screens. Subtle accent color tracks the active
+   orientation so the button reads correctly at a glance. */
+#orientationButton .orientation-icon {
+  font-size: 1.2em;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-color);
+  text-shadow: 0 0 6px rgba(255, 160, 0, 0.45);
+  display: inline-block;
+  min-width: 1.1em;
+  text-align: center;
+}
+#orientationButton[data-orientation="vertical"] .orientation-icon {
+  color: var(--sky-accent);
+  text-shadow: 0 0 6px rgba(79, 195, 247, 0.45);
+}
+
 .control-button:active {
   transform: translateY(1px);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
@@ -3151,11 +3169,18 @@ body {
 }
 
 .campaign-paths .path-segment {
-  /* Trail dashes between mission nodes were visually noisy without
-     adding navigational value — the numbered labels and arrow already
-     convey order. Hidden rather than deleted so the SVG geometry is
-     trivially restorable. */
-  display: none;
+  fill: none;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+.campaign-paths .path-segment.unlocked {
+  stroke: rgba(255, 215, 0, 0.95);
+  stroke-dasharray: 2.2 1.4;
+  filter: drop-shadow(0 0 1.2px rgba(255, 215, 0, 0.9));
+}
+.campaign-paths .path-segment.locked {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-dasharray: 1.6 2.2;
 }
 
 .map-node {
@@ -5014,6 +5039,39 @@ body.drag-active .board {
   -webkit-user-select: none;
 }
 .drag-rotate-btn:active { transform-origin: center; }
+
+/* Desktop drag — "press R to rotate" chip floating beside the ghost.
+   Mouse only has one pointer, so the touch-style ↻ button can't be
+   tapped during a drag — show the keyboard shortcut instead. */
+.drag-rotate-hint {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #f5f7fa;
+  background: rgba(10, 14, 22, 0.92);
+  border: 1px solid rgba(255, 215, 0, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  transform: translate3d(-9999px, -9999px, 0);
+  transition: opacity 180ms ease;
+}
+.drag-rotate-hint kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0a0a10;
+  background: gold;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
 
 /* First-time placement coach mark on the active dock ship. Removed once
    the user has dragged something at least once (we set a flag in
