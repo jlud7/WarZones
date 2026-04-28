@@ -4930,12 +4930,13 @@ body {
     border: 1px solid rgba(79, 216, 232, 0.18);
     color: var(--mb-ink-dim);
   }
-  /* During combat (#fleetDock gains .hidden) the rotate/undo setup
-     controls aren't relevant. With the bottom new-game buttons now
-     moved into the header menu, nothing in .game-controls is useful
-     during combat — hide the whole panel so its empty padding doesn't
-     leave a phantom band at the bottom of the screen. */
-  body:has(#fleetDock.hidden) .game-controls {
+  /* The rotate/undo setup controls only make sense during placement.
+     Now that the bottom new-game buttons live in the header menu,
+     nothing in .game-controls is useful during combat or game-over —
+     hide the panel via the explicit phase class on body so the empty
+     padding doesn't leave a phantom band at the bottom of the screen. */
+  body.phase-combat .game-controls,
+  body.phase-gameover .game-controls {
     display: none;
   }
 }
@@ -4968,13 +4969,16 @@ body {
 }
 .dock-ship.current:active { cursor: grabbing; }
 
-/* Mobile: keep the dock visible while the user reaches the boards. Sticks
-   to the top of the viewport during placement only — `.fleet-dock.hidden`
-   already removes it during combat. */
+/* Mobile: keep the dock visible while the user reaches the boards.
+   Sticks just *below* the sticky header (which sticks at top:0) so
+   they don't overlap. `.fleet-dock.hidden` already removes the dock
+   during combat, and the new body.phase-combat class also drops the
+   game-controls panel, so this only matters during setup. */
 @media (max-width: 768px) {
+  :root { --header-sticky-h: 44px; }
   .fleet-dock {
     position: sticky;
-    top: 0;
+    top: var(--header-sticky-h);
     z-index: 50;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
