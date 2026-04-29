@@ -3818,16 +3818,16 @@ body {
   line-height: 1.6;
   color: var(--text-secondary);
   text-align: left;
-  padding: 0.75rem;
+  padding: 0.85rem 1rem;
   background: rgba(0,0,0,0.3);
   border-radius: 6px;
-  border-left: 3px solid var(--primary-color);
+  border: 1.5px solid var(--primary-color);
   margin-bottom: 1rem;
   font-family: 'Orbitron', sans-serif;
 }
 
-.briefing-mini-boss .briefing-text { border-left-color: #ff5252; }
-.briefing-final-boss .briefing-text { border-left-color: #ffd700; }
+.briefing-mini-boss .briefing-text { border-color: #ff5252; }
+.briefing-final-boss .briefing-text { border-color: #ffd700; }
 
 .briefing-modifiers {
   margin-bottom: 1rem;
