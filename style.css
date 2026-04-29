@@ -4074,6 +4074,65 @@ body {
   border-color: rgba(255, 82, 82, 0.15) !important;
 }
 
+/* ===== Signature Trick Visuals ===== */
+
+/* Decoy Echoes (Abyssal): cell flashes red on impact, then reveals as a
+   ghostly miss. Two stages — .decoy-flash for the bait, .decoy-revealed
+   for the reveal. */
+.cell.decoy-flash {
+  background: rgba(255, 60, 60, 0.65) !important;
+  color: #fff !important;
+  animation: decoyFlash 0.9s ease;
+}
+@keyframes decoyFlash {
+  0%   { background: rgba(255, 60, 60, 0.85); transform: scale(1.15); box-shadow: 0 0 20px rgba(255, 60, 60, 0.7); }
+  60%  { background: rgba(255, 60, 60, 0.55); transform: scale(1.05); }
+  100% { background: rgba(255, 60, 60, 0.30); transform: scale(1.0);  box-shadow: none; }
+}
+.cell.decoy-revealed {
+  background: rgba(120, 200, 220, 0.12) !important;
+  border-color: rgba(120, 200, 220, 0.35) !important;
+  animation: decoyReveal 0.6s ease;
+}
+@keyframes decoyReveal {
+  0%   { background: rgba(120, 200, 220, 0.45); transform: scale(0.9); }
+  100% { background: rgba(120, 200, 220, 0.12); transform: scale(1.0); }
+}
+.decoy-icon {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255, 60, 60, 0.9);
+}
+.decoy-icon-revealed {
+  font-size: 0.9rem;
+  color: rgba(180, 220, 235, 0.75);
+  letter-spacing: 0.05em;
+}
+
+/* Hydra Regrowth: cell briefly pulses gold-green as a destroyed cell
+   restores. Removes after the animation finishes. */
+.cell.regrowing {
+  animation: regrowPulse 1.5s ease;
+  background: rgba(120, 220, 140, 0.25) !important;
+  border-color: rgba(120, 220, 140, 0.6) !important;
+}
+@keyframes regrowPulse {
+  0%   { background: rgba(255, 82, 82, 0.6);  transform: scale(0.85); box-shadow: 0 0 18px rgba(255, 82, 82, 0.5); }
+  40%  { background: rgba(120, 220, 140, 0.5); transform: scale(1.15); box-shadow: 0 0 22px rgba(120, 220, 140, 0.8); }
+  100% { background: rgba(120, 220, 140, 0.0); transform: scale(1.0);  box-shadow: none; }
+}
+
+/* Shadow Ship (Specter): hits on the shadow ship land directly as
+   decayed marks. Layer a faint purple tint on top of .decayed so the
+   player can tell shadow-decay apart from regular hit-decay. */
+.cell.shadow-hit {
+  background: rgba(150, 120, 220, 0.18) !important;
+  border-color: rgba(150, 120, 220, 0.40) !important;
+  color: rgba(220, 200, 255, 0.55) !important;
+  text-shadow: 0 0 4px rgba(150, 120, 220, 0.6);
+}
+
 /* ===== Enemy Portraits ===== */
 
 /* Campaign map node portrait (legacy list + new world map both use this class) */
