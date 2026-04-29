@@ -4158,6 +4158,25 @@ body {
   white-space: nowrap;
   animation: signatureBannerIn 0.32s cubic-bezier(.34,1.56,.64,1) forwards;
 }
+/* Compact variant for triggers that fire repeatedly (Voss twin salvo /
+   desperation barrage on every miss). Smaller, parked at the top of
+   the screen, less drama on the entrance — still impossible to miss
+   but doesn't yank focus to the middle of the board every shot. */
+.signature-banner.compact {
+  top: 9%;
+  font-size: clamp(0.65rem, 1.6vw, 0.85rem);
+  padding: 0.42rem 0.95rem;
+  letter-spacing: 0.14em;
+  background: linear-gradient(135deg, rgba(220, 60, 60, 0.85), rgba(255, 110, 80, 0.85));
+  border-width: 1px;
+  box-shadow: 0 0 16px rgba(220, 60, 60, 0.5), 0 2px 10px rgba(0, 0, 0, 0.4);
+  animation: signatureBannerInCompact 0.22s ease-out forwards;
+}
+@keyframes signatureBannerInCompact {
+  0%   { opacity: 0; transform: translate(-50%, -120%) scale(0.95); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 .signature-banner-out {
   animation: signatureBannerOut 0.38s ease forwards;
 }
