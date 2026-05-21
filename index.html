@@ -25,13 +25,23 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script>
-    // WarZones Firebase project — Realtime Database for online room signaling
-    firebase.initializeApp({
-      apiKey: "AIzaSyD_placeholder_warzones_a515c",
-      authDomain: "warzones-a515c.firebaseapp.com",
-      databaseURL: "https://warzones-a515c-default-rtdb.firebaseio.com",
-      projectId: "warzones-a515c"
-    });
+    // Firebase powers ONLY online multiplayer (Play Online → Host/Join).
+    // Campaign, Play vs AI, and local 2-player never touch it.
+    //
+    // The web config is intentionally NOT committed here — a key was leaked
+    // in this file before. To enable online play, define
+    // window.WARZONES_FIREBASE_CONFIG before this runs (e.g. add
+    // `<script src="firebase-config.js"></script>` above — it's gitignored;
+    // copy firebase-config.example.js) and use a RESTRICTED web key. If it's
+    // absent, online play is simply disabled and every other mode works
+    // normally.
+    if (window.WARZONES_FIREBASE_CONFIG && typeof firebase !== 'undefined') {
+      try {
+        firebase.initializeApp(window.WARZONES_FIREBASE_CONFIG);
+      } catch (e) {
+        console.warn('Firebase init failed; online play disabled.', e);
+      }
+    }
   </script>
 </head>
 <body>

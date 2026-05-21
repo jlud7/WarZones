@@ -3,3 +3,7 @@ tools/**/__pycache__/
 .archive/
 .DS_Store
 .claude/
+
+# Local Firebase web config for online play (never commit a real key).
+# Copy firebase-config.example.js -> firebase-config.js and fill it in.
+firebase-config.js
