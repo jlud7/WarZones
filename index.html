@@ -11,7 +11,7 @@
   <!-- Mobile battle-UI accent fonts: Rajdhani for tactical labels,
        JetBrains Mono for stat numerals. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" />
-  <link rel="stylesheet" href="style.css?v=20260627" />
+  <link rel="stylesheet" href="style.css?v=20260627b" />
   <!-- Preload ship sprites so placement has no load delay -->
   <link rel="preload" as="image" href="assets/ships/spacecraft.webp" />
   <link rel="preload" as="image" href="assets/ships/fighterjet.webp" />
@@ -28,16 +28,22 @@
     // Firebase powers ONLY online multiplayer (Play Online → Host/Join).
     // Campaign, Play vs AI, and local 2-player never touch it.
     //
-    // The web config is intentionally NOT committed here — a key was leaked
-    // in this file before. To enable online play, define
-    // window.WARZONES_FIREBASE_CONFIG before this runs (e.g. add a script
-    // tag loading firebase-config.js above — it's gitignored; copy
-    // firebase-config.example.js) and use a RESTRICTED web key. If it's
-    // absent, online play is simply disabled and every other mode works
-    // normally.
+    // This is a KEYLESS config: the app uses only the Realtime Database (no
+    // Auth, Storage, etc.), and the RTDB SDK connects via databaseURL alone —
+    // no API key required. A databaseURL is not a secret (it's visible in any
+    // browser client), and access is gated by database.rules.json, which
+    // permits read/write only under /rooms/{code}. That's why the earlier API
+    // key leak does NOT recur here: there is no key to leak. If you ever need
+    // Auth/other services, supply a RESTRICTED web key (HTTP-referrer locked
+    // to this domain) — don't paste an unrestricted one.
     // NOTE: never write a literal closing script tag inside this comment —
     // the HTML parser terminates the script element there and dumps the
     // rest of this block as visible page text.
+    window.WARZONES_FIREBASE_CONFIG = window.WARZONES_FIREBASE_CONFIG || {
+      databaseURL: "https://warzones-a515c-default-rtdb.firebaseio.com",
+      projectId: "warzones-a515c",
+      authDomain: "warzones-a515c.firebaseapp.com"
+    };
     if (window.WARZONES_FIREBASE_CONFIG && typeof firebase !== 'undefined') {
       try {
         firebase.initializeApp(window.WARZONES_FIREBASE_CONFIG);
@@ -269,15 +275,15 @@
        players kept running stale game logic after a deploy (e.g. an old
        BlackBox build that let Player 2 place a jet on the enemy board). Bump
        the version whenever the bundled JS/CSS changes so browsers re-fetch. -->
-  <script src="lib/game-state.js?v=20260627"></script>
-  <script src="lib/sound.js?v=20260627"></script>
-  <script src="lib/animations.js?v=20260627"></script>
-  <script src="lib/statistics.js?v=20260627"></script>
-  <script src="lib/ai.js?v=20260627"></script>
-  <script src="lib/network.js?v=20260627"></script>
-  <script src="lib/ui.js?v=20260627"></script>
-  <script src="lib/campaign.js?v=20260627"></script>
-  <script src="lib/game.js?v=20260627"></script>
-  <script src="script.js?v=20260627"></script>
+  <script src="lib/game-state.js?v=20260627b"></script>
+  <script src="lib/sound.js?v=20260627b"></script>
+  <script src="lib/animations.js?v=20260627b"></script>
+  <script src="lib/statistics.js?v=20260627b"></script>
+  <script src="lib/ai.js?v=20260627b"></script>
+  <script src="lib/network.js?v=20260627b"></script>
+  <script src="lib/ui.js?v=20260627b"></script>
+  <script src="lib/campaign.js?v=20260627b"></script>
+  <script src="lib/game.js?v=20260627b"></script>
+  <script src="script.js?v=20260627b"></script>
 </body>
 </html>
