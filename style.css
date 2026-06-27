@@ -199,6 +199,16 @@ body {
   color: #ffc400;
 }
 
+/* Error variant: shown when online play is unavailable (no Firebase backend). */
+.menu-notice.menu-notice-error {
+  background: rgba(239, 83, 80, 0.1);
+  border-color: rgba(239, 83, 80, 0.5);
+}
+
+.menu-notice.menu-notice-error strong {
+  color: #ef5350;
+}
+
 .menu-button {
   width: 240px;
   padding: 13px 18px;
